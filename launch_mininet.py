@@ -1,4 +1,7 @@
 #!/usr/bin/python
+import time
+import os
+
 from mininet.topo import Topo
 from mininet.net import Mininet
 from mininet.util import dumpNodeConnections
@@ -24,13 +27,17 @@ def run():
     net = Mininet(topo=topo, link=TCLink)
     net.start()
     print("Simulation Begin")
+    os.popen('ovs-vsctl add-port s1 ens33')
     h1, h2, h3, h4 = net.get("h1", "h2", "h3", "h4")
-    h1.cmd('./test/run-pub.sh')
-    h1.cmd('./test/run-sub.sh')
-    h2.cmd('./test/run-pub.sh')
-    h2.cmd('./test/run-sub.sh')
+    h1.cmdPrint('dhclient '+h1.defaultIntf().name)
+    h2.cmdPrint('dhclient '+h2.defaultIntf().name)
+    h3.cmdPrint('dhclient '+h3.defaultIntf().name)
+    h4.cmdPrint('dhclient '+h4.defaultIntf().name)
 
-    time.sleep(1)
+    h4.cmd('python3 node/run.py --id 0004 &')
+    h1.cmd('python3 node/run.py --id 0001 &')
+    h3.cmd('python3 node/run.py --id 0003 &')
+    h2.cmd('python3 node/run.py --id 0002 &')
 
     CLI(net)
     print("Simulation End")
