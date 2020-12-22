@@ -6,6 +6,7 @@ from collections import defaultdict
 from const import *
 import argparse
 import zmq
+import time
 
 
 def print_and_pub(topic, body, prefix=None):
@@ -115,6 +116,7 @@ def subscriber_init():
 
 
 def on_hb_data(sensor_id, timestamp):
+    print("Get Msg from "+sensor_id)
     if sensor_id not in Global.members:
         Global.members[sensor_id] = Member(sensor_id)
         print("Current members: ", list(Global.members.keys()))
@@ -163,6 +165,7 @@ def detect_failure():
         if reelect:
             with Global.lock_election:
                 Global.election_status = "NOLEADER"
+                Global.leader = None
             init_election()
         time.sleep(10)
 

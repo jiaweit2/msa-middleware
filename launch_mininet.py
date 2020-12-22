@@ -10,6 +10,8 @@ from mininet.node import Node
 from mininet.cli import CLI
 from mininet.link import TCLink
 
+from node.const import *
+
 
 class SingleSwitchTopo(Topo):
     # "Single switch connected to n hosts."
@@ -27,21 +29,26 @@ def run():
     net = Mininet(topo=topo, link=TCLink)
     net.start()
     print("Simulation Begin")
-    os.popen('ovs-vsctl add-port s1 ens33')
-    h1, h2, h3, h4 = net.get("h1", "h2", "h3", "h4")
-    h1.cmdPrint('dhclient '+h1.defaultIntf().name)
-    h2.cmdPrint('dhclient '+h2.defaultIntf().name)
-    h3.cmdPrint('dhclient '+h3.defaultIntf().name)
-    h4.cmdPrint('dhclient '+h4.defaultIntf().name)
 
-    h4.cmd('python3 node/run.py --id 0004 &')
-    h1.cmd('python3 node/run.py --id 0001 &')
-    h3.cmd('python3 node/run.py --id 0003 &')
-    h2.cmd('python3 node/run.py --id 0002 &')
+    h1, h2, h3, h4 = net.get("h1", "h2", "h3", "h4")
+    h1.cmd('cd /home/mike/Project/aurora-net-iobt-cra-site-server/src/server')
+    h1.cmd('docker-compose up -d')
+    h1.cmd('cd /home/mike/Project/msa-middleware')
+
+    h4.cmd('node/run.sh 0004 &')
+    h1.cmd('node/run.sh 0001 &')
+    h3.cmd('node/run.sh 0003 &')
+    h2.cmd('node/run.sh 0002 &')
 
     CLI(net)
     print("Simulation End")
+
+    # Cleanup
+    h1.cmd('cd /home/mike/Project/aurora-net-iobt-cra-site-server/src/server')
+    h1.cmd('docker-compose down')
+    os.popen('sudo docker stop $(sudo docker ps -aq)')
     net.stop()
+
 
 
 if __name__ == "__main__":
