@@ -35,10 +35,10 @@ def run():
     h1.cmd('docker-compose up -d')
     h1.cmd('cd /home/mike/Project/msa-middleware')
 
-    h4.cmd('node/run.sh 0004 &')
-    h1.cmd('node/run.sh 0001 &')
-    h3.cmd('node/run.sh 0003 &')
-    h2.cmd('node/run.sh 0002 &')
+    h4.cmd('middleware/node/run.sh 0004 &')
+    h1.cmd('middleware/node/run.sh 0001 &')
+    h3.cmd('middleware/node/run.sh 0003 &')
+    h2.cmd('middleware/node/run.sh 0002 &')
 
     CLI(net)
     print("Simulation End")
