@@ -14,7 +14,8 @@ from threading import Timer
 
 import numpy as np
 
-from name import Name
+from middleware.common.name import Name
+from middleware.common.utils import *
 
 DEFAULT_FRESHNESS_P = 60
 
@@ -23,12 +24,12 @@ DEFAULT_DEADLINE = 360
 
 # VARIABLE TYPES
 # CONTENTS = 'CONTENTS'
-LABEL = 'LABEL'
-DECISION = 'DECISION'
+LABEL = "LABEL"
+DECISION = "DECISION"
 
 # VARIABLE VALUE STATUS
-UNDECIDED = 'undecided'
-UNRESOLVABLE = 'unresolvable'
+UNDECIDED = "undecided"
+UNRESOLVABLE = "unresolvable"
 OTHERWISE = "otherwise"
 
 # FETCH / PREFETCH
@@ -36,7 +37,7 @@ FETCH = 1
 PREFETCH = 0
 
 # DECISION MAKER PARAMETERS
-DEFAULT_PERIOD = 1  
+DEFAULT_PERIOD = 1
 DEFAULT_PROB = 0.5
 DEFAULT_COST = 1
 # MAX_SIZE = 1000000000

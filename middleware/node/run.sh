@@ -1,4 +1,6 @@
 docker run -i --rm --name node_"$1" \
-    -v ${PWD}/middleware/node/:/usr/src/app/ \
+    -v ${PWD}/../:/usr/src/app/ \
+    -v /home/mike/Desktop/darknet/:/usr/src/app/darknet/ \
     --network host \
-    aurora-net python -u node.py --id "$1"
+    -e PYTHONPATH="/usr/src/app/:$PYTHONPATH" \
+    aurora-net python -u middleware/node/node.py --id "$1" --skills "$2"
