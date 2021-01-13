@@ -31,6 +31,13 @@ def subscribe():
 
 
 if __name__ == "__main__":
+    """
+    Query format:
+    {required skill A},{skill B}...
+    /Name = Decision({
+        {conditions}
+    })
+    """
     query = ""
     with open("application/data/query") as f:
         lines = f.readlines()

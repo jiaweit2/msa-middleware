@@ -7,8 +7,22 @@ import zmq
 
 from middleware.node.const import *
 from middleware.node.utils import *
-from middleware.common.parser import AthenaParser
-from middleware.common.decision import Decision
+
+"""
+Query Execution
+1. A Query is sent by commander (can be on any node)
+2. The query should be sent to a known node
+3. The query will be parsed on the receiving node (from Athena)
+4. The receiving node may or may not have the required skill
+    4.1 Every node has a members list and is awared of the skillset
+        other nodes have
+    4.2 If no such skill on this current node (or due to optimization need),
+        find the qualified node, ask it to send back annotated data
+    4.3 Annotation happens on the node who has the skill (only for now...,
+        and annotation methods can be preinstalled on every node?)
+5. The receiving node will have a decision based on the query (from Athena)
+6. Send back the result to the commander node
+"""
 
 
 class Global:
@@ -109,7 +123,7 @@ def subscriber_init():
                 on_dm(prefix, body)
         elif topic == "query":
             # Current node is assigned to process a query
-            on_query(body)
+            on_query(body, Global)
 
 
 def on_hb_data(sensor_id, body):
@@ -159,53 +173,7 @@ def on_dm(prefix, body):
         print_and_pub(sensor_id, str(annotated_data), Global.publisher, "decide")
     elif prefix == "decide":
         annotated_data = eval(body)
-        on_query_decide(annotated_data)
-
-
-def on_query(query):
-    name, skills_req, input_str = query.split("\t")
-    skills_req = skills_req.split(",")
-    # Parse boolean expression of decision query
-    a = AthenaParser()
-    a.load_str(input_str)
-    decision_logic, coa_validity, predicates = a.variables[name][1:4]
-    post_process_coa(coa_validity)
-    print(coa_validity)
-    with Global.lock:
-        Global.buffer_query = [decision_logic, coa_validity, predicates]
-
-    # TODO: A better middleware algorithm to find the best suiting nodes
-    # Assume only one skill here in skills_req
-    skill = skills_req[0]
-    if skill not in Global.skills:
-        for sensor, member in Global.members.items():
-            if skill in member.skills:
-                print_and_pub(
-                    sensor, skill + "\t" + Global.curr_id, Global.publisher, "get_data"
-                )
-                break
-    else:
-        annotated_data = get_latest_data(skill)
-        on_query_decide(annotated_data)
-
-
-def on_query_decide(annotated_data):
-    if not Global.buffer_query:
-        return
-    decision_logic, coa_validity, predicates = Global.buffer_query
-    d = Decision("/query_res", decision_logic, coa_validity, predicates, 60)
-    variables = []
-    for p in predicates:
-        variables.append(predicates[p][0])
-    for var in annotated_data:
-        if var in variables:
-            d.set_var_value(var, annotated_data[var])
-    if d.get_value():
-        print_and_pub("query_result", d.get_value(), Global.publisher)
-    else:
-        print("Something is wrong with the decision model")
-    with Global.lock:
-        Global.buffer_query = None
+        on_query_decide(annotated_data, Global)
 
 
 def detect_failure():
