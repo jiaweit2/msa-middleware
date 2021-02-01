@@ -4,9 +4,10 @@ from queue import Queue
 from threading import RLock, Thread, Timer
 
 import zmq
-
 from middleware.node.const import *
 from middleware.node.utils import *
+from middleware.node.query import *
+from middleware.preset.annotators import annotator_presets, annotator_to_sensor
 
 """
 Query Execution
@@ -29,14 +30,16 @@ class Global:
     publisher = None
     curr_id = None
     members = {}
-    skills = []
-    lock = RLock()
+    # If no custom function, use default optimizer
+    optimizer = Optimizer()
 
     leader = None
     election_status = "NOLEADER"
+
+    lock = RLock()
     lock_election = RLock()
 
-    buffer_query = None
+    buffer = None
 
 
 def call_election(cand=Global.curr_id):
@@ -84,7 +87,7 @@ def publisher_init():
     while True:
         print_and_pub(
             "heartbeat",
-            str(int(time.time())) + "\t" + list_to_str(Global.skills),
+            str(int(time.time())),
             Global.publisher,
             Global.curr_id,
         )
@@ -126,8 +129,7 @@ def subscriber_init():
             on_query(body, Global)
 
 
-def on_hb_data(sensor_id, body):
-    timestamp, skills = body.split("\t")
+def on_hb_data(sensor_id, timestamp):
     # print("Get Msg from " + sensor_id)
     if sensor_id not in Global.members:
         Global.members[sensor_id] = Member(sensor_id)
@@ -141,7 +143,6 @@ def on_hb_data(sensor_id, body):
     with Global.lock:
         Global.members[sensor_id].last_sent = timestamp
         Global.members[sensor_id].last_updated = int(time.time())
-        Global.members[sensor_id].skills = skills
 
 
 def on_election_data(prefix, cand_id):
@@ -168,12 +169,15 @@ def on_election_data(prefix, cand_id):
 
 def on_dm(prefix, body):
     if prefix == "get_data":
-        skill, sensor_id = body.split("\t")
-        annotated_data = get_latest_data(skill)
-        print_and_pub(sensor_id, str(annotated_data), Global.publisher, "decide")
+        annotator, sensor_id = body.split("\t")
+        with Global.lock:
+            val = Global.members["SELF"].annotators.run(annotator)
+        print_and_pub(sensor_id, str(val), Global.publisher, "decide")
     elif prefix == "decide":
-        annotated_data = eval(body)
-        on_query_decide(annotated_data, Global)
+        val = eval(body)
+        if Global.buffer and len(Global.buffer)==6:
+            Global.buffer[4].append(val)
+            schedule(Global)
 
 
 def detect_failure():
@@ -201,8 +205,17 @@ def detect_failure():
 
 
 def main(args):
+    # Assign values to Global
     Global.curr_id = args.id
-    Global.skills = args.skills.split(",")
+    Global.members["SELF"] = Member("SELF")
+    # Retrieve preset annotating functions
+    annotators = args.annotators.split(",")
+    for annotator in annotators:
+        if annotator in annotator_presets:
+            Global.members["SELF"].annotators.add(
+                annotator, annotator_presets[annotator]
+            )
+
     t1 = Thread(target=publisher_init, args=())
     t2 = Thread(target=subscriber_init, args=())
     t3 = Thread(target=detect_failure, args=())
@@ -217,7 +230,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--id", "-i", dest="id", type=str, help="Sensor ID")
     parser.add_argument(
-        "--skills", "-s", dest="skills", type=str, help="Skills {a,b,c...}"
+        "--annotators", "-a", dest="annotators", type=str, help="Annotators {a,b,c...}"
     )
     args = parser.parse_args()
     main(args)

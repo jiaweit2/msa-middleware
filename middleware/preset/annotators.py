@@ -1,9 +1,10 @@
-import cv2
-import numpy as np
 from middleware.node.const import *
 
+# Preset Annotators
+def YOLO(data):
+    import cv2
+    import numpy as np
 
-def YOLO_Annotate(data):
     nparr = np.frombuffer(data, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     net = cv2.dnn.readNet(WEIGHT_URL, CFG_URL)
@@ -31,5 +32,8 @@ def YOLO_Annotate(data):
             conf = scores[class_id]
             if conf > 0.3:
                 res[classes[class_id]] = float(conf)
-    print(res)
     return res
+
+
+annotator_presets = {"YOLO": [YOLO, 5]}
+annotator_to_sensor = {"YOLO": "Camera", "IR": "Infrared", "SR": "Sonar"}

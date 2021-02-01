@@ -1,4 +1,3 @@
-Camera
 /YOLO = Decision({
     "Human": person > 0.5,
     "NoHumanDetected": otherwise

@@ -33,7 +33,7 @@ def subscribe():
 if __name__ == "__main__":
     """
     Query format:
-    {required skill A},{skill B}...
+    Lat,Long
     /Name = Decision({
         {conditions}
     })
@@ -42,11 +42,7 @@ if __name__ == "__main__":
     with open("application/data/query") as f:
         lines = f.readlines()
         query += (
-            lines[1].split("=")[0].strip()
-            + "\t"
-            + lines[0].strip()
-            + "\t"
-            + "".join(lines[1:])
+            lines[1].split("=")[0].strip() + "\t" + "".join(lines[1:]) + "\t" + lines[0].strip()
         )
     publisher = publisher_init()
     print_and_pub("system", "Preparing to publish...", publisher)

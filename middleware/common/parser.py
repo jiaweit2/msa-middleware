@@ -234,7 +234,7 @@ class AthenaParser(object):
 if __name__ == "__main__":
     a = AthenaParser()
     input_str = """/Champaign/cloth = Decision({
-    "Jumper": ((/Champaign/temperature <= 5) | (/Champaign/windSpeed >= 30)),
+    "Jumper": ((/Champaign/temperature <= 5) & (/Champaign/windSpeed >= 30)),
     "T-Shirt": ((/Champaign/temperature >= 25) | (/Champaign/windSpeed <= 10)),
     "Rain coat": /Champaign/rain == True,
     "Hoody": otherwise

@@ -36,10 +36,10 @@ def run():
     h1.cmd("docker-compose up -d")
     h1.cmd("cd -")
 
-    h4.cmd("../middleware/node/run.sh 0004 Wind &")
-    h1.cmd("../middleware/node/run.sh 0001 Thermo &")
-    h3.cmd("../middleware/node/run.sh 0003 Camera &")
-    h2.cmd("../middleware/node/run.sh 0002 Temp &")
+    h4.cmd("../middleware/node/run.sh 0004 IR &")
+    h1.cmd("../middleware/node/run.sh 0001 IR &")
+    h3.cmd("../middleware/node/run.sh 0003 YOLO &")
+    h2.cmd("../middleware/node/run.sh 0002 SR &")
 
     CLI(net)
     print("Simulation End")

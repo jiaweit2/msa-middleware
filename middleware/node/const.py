@@ -1,13 +1,53 @@
 import time
+from middleware.preset.annotators import annotator_to_sensor
+from middleware.node.utils import get_sensor_data
 
 
 class Member:
     def __init__(self, _id):
         self.id = _id
         self.failed = False
-        self.last_updated = int(time.time())
+        self.last_updated = 0
+        if _id != "SELF":
+            self.last_updated = int(time.time())
         self.last_sent = 0
-        self.skills = []
+        self.annotators = AnnotatorSet()
+
+
+class AnnotatorSet:
+    def __init__(self):
+        self.map = {}
+
+    def run(self, annotator):
+        if annotator in self.map:
+            # Get latest data 
+            sensor = annotator_to_sensor[annotator]
+            data = get_sensor_data(sensor)
+            return self.map[annotator][0](data)
+        return None
+
+    def add(self, annotator, annotator_meta):
+        self.map[annotator] = annotator_meta  # -> [func, cost] (func=None if remote)
+
+    def remove(self, annotator):
+        del self.map[annotator]
+
+    # s: string output from __repr__()
+    def update(self, s):
+        for item in s.split(";"):
+            k, cost = item.split(",")
+            if k not in self.map:
+                self.map[k] = [None, cost]
+            elif cost < self.map[k][1]:
+                self.map[k][1] = cost
+
+    def __repr__(self):
+        s = ""
+        for k in self.map:
+            if s:
+                s += ";"
+            s += k + "," + str(self.map[k][1])
+        return s
 
 
 PUB_URL = "tcp://localhost:9101"
