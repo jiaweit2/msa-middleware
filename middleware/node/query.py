@@ -1,6 +1,7 @@
 from middleware.common.decision import Decision
 from middleware.common.parser import AthenaParser
 from middleware.node.utils import *
+from middleware.node.const import *
 
 
 def on_query(query, Global):
@@ -19,25 +20,33 @@ def on_query(query, Global):
 
 def schedule(Global):
     d, plan, predicates, num, vals, last_predicate = Global.buffer
+
     if len(vals) < num:
         # wait for more remote sensor values
         return
-    while not d.get_value():
+
+    while d.get_value() == "undecided":
         if len(vals) > 0:
             predicate = last_predicate
         else:
             predicate = d.pick()
+            if predicate is None:
+                print("Fail to conclude a decision!")
+                break
             with Global.lock:
-                last_predicate = predicate
-                Global.buffer[3] = len(plan[predicate])
+                Global.buffer[5] = predicate
+                num = Global.buffer[3] = len(plan[predicate])
+            var = predicates[predicate][0]
             for owner, annotator in plan[predicate]:
                 if owner == "SELF":
                     with Global.lock:
-                        vals.append(Global.members[owner].annotators.run(annotator))
+                        vals.append(
+                            Global.members[owner].annotators.run(annotator, var)
+                        )
                 else:
                     print_and_pub(
                         owner,
-                        annotator + "\t" + Global.curr_id,
+                        annotator + "\t" + var + "\t" + Global.curr_id,
                         Global.publisher,
                         "get_data",
                     )

@@ -384,7 +384,7 @@ class Decision(Variable):
 
         chosen_leaf_idx = leaf_cost.index(max(leaf_cost))
         chosen_leaf = decision_logic[chosen_subtree_idx][chosen_leaf_idx]
-        print(decision_logic)
+        # print(decision_logic)
         return chosen_leaf
 
     def process(self):
@@ -403,7 +403,7 @@ class Decision(Variable):
 
 
 if __name__ == "__main__":
-    coa_validity = {"CoA1": "Or(p1, p3)", "CoA2": "And(p2, p0)", "CoA3": "And(p4)"}
+    coa_validity = {"CoA1": "Or(p1, p3)", "CoA2": "And(p2, p0)", "CoA3": "otherwise"}
 
     predicates = {
         "p0": ["/temperature", ">=", "10"],
@@ -443,9 +443,9 @@ if __name__ == "__main__":
 
     print(d.pick())
     print("---------------------------!!!-------------------------")
-    d.set_var_value("/temperature", "45")
-    d.set_var_value("/precipitation", "50")
-    d.set_var_value("/windSpeed", "90")
+    d.set_var_value("/temperature", "0")
+    d.set_var_value("/precipitation", "0")
+    d.set_var_value("/windSpeed", "0")
 
     if d.get_value():
         print(d.get_value())

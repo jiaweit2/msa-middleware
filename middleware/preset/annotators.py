@@ -35,5 +35,13 @@ def YOLO(data):
     return res
 
 
-annotator_presets = {"YOLO": [YOLO, 5]}
+def IR(data):
+    return {"person": 0.4}
+
+
+def SR(data):
+    return {"person": 0.99}
+
+
+annotator_presets = {"YOLO": [YOLO, 5], "IR": [IR, 2], "SR": [SR, 2]}
 annotator_to_sensor = {"YOLO": "Camera", "IR": "Infrared", "SR": "Sonar"}

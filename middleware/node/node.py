@@ -1,29 +1,12 @@
 import argparse
-import time
 from queue import Queue
-from threading import RLock, Thread, Timer
+from threading import RLock
 
 import zmq
-from middleware.node.const import *
-from middleware.node.utils import *
+from middleware.brain.optimizer import Optimizer
 from middleware.node.query import *
+from middleware.node.utils import *
 from middleware.preset.annotators import annotator_presets, annotator_to_sensor
-
-"""
-Query Execution
-1. A Query is sent by commander (can be on any node)
-2. The query should be sent to a known node
-3. The query will be parsed on the receiving node (from Athena)
-4. The receiving node may or may not have the required skill
-    4.1 Every node has a members list and is awared of the skillset
-        other nodes have
-    4.2 If no such skill on this current node (or due to optimization need),
-        find the qualified node, ask it to send back annotated data
-    4.3 Annotation happens on the node who has the skill (only for now...,
-        and annotation methods can be preinstalled on every node?)
-5. The receiving node will have a decision based on the query (from Athena)
-6. Send back the result to the commander node
-"""
 
 
 class Global:
@@ -42,13 +25,16 @@ class Global:
     buffer = None
 
 
-def call_election(cand=Global.curr_id):
+def call_election(cand=None):
     if (
         Global.election_status == "WAIT"
         or Global.election_status == "ELECTED"
         and Global.leader > Global.curr_id
     ):
         return
+    if cand is None:
+        cand = Global.curr_id
+
     with Global.lock_election:
         Global.election_status = "ELECTED"
         Global.leader = cand
@@ -60,17 +46,15 @@ def init_election():
     with Global.lock_election:
         if Global.election_status not in ["NEEDRESP", "ELECTED"]:
             if (
-                len(Global.members.keys()) == 0
+                len(Global.members.keys()) == 1
                 or max(Global.members.keys()) < Global.curr_id
             ):
-                call_election(Global.curr_id)
+                call_election()
             else:
                 Global.election_status = "NEEDRESP"
                 print_and_pub("election", Global.curr_id, Global.publisher, "elect")
-                t = Timer(ELECTION_RES_TIMEOUT, call_election)
-                t.start()
-                t2 = Timer(ELECTION_WAIT_TIMEOUT, init_election)
-                t2.start()
+                async_run_after(ELECTION_RES_TIMEOUT, call_election)
+                async_run_after(ELECTION_WAIT_TIMEOUT, init_election)
                 print_and_pub("election", Global.curr_id, Global.publisher, "OK")
 
 
@@ -83,6 +67,18 @@ def publisher_init():
     Global.publisher.connect(PUB_URL)
     print_and_pub("system", "Preparing to publish...", Global.publisher)
     time.sleep(3)
+
+    # Tell others my annotators
+    async_run_after(
+        6,
+        lambda: print_and_pub(
+            "annotator",
+            str(Global.members["SELF"].annotators),
+            Global.publisher,
+            Global.curr_id,
+        ),
+    )
+
     # Start heartbeat
     while True:
         print_and_pub(
@@ -102,7 +98,7 @@ def subscriber_init():
     print("Connecting to: %s" % SUB_URL)
     subscriber.connect(SUB_URL)
 
-    topics = [b"heartbeat", b"election", b"query", Global.curr_id]
+    topics = ["heartbeat", "election", "query", "annotator", Global.curr_id]
     for topic in topics:
         if type(topic) is str:
             topic = topic.encode("utf-8")
@@ -122,6 +118,8 @@ def subscriber_init():
                 on_hb_data(prefix, body)
             elif topic == "election":
                 on_election_data(prefix, body)
+            elif topic == "annotator":
+                on_annotator(prefix, body)
             elif topic == Global.curr_id:
                 on_dm(prefix, body)
         elif topic == "query":
@@ -129,20 +127,16 @@ def subscriber_init():
             on_query(body, Global)
 
 
-def on_hb_data(sensor_id, timestamp):
-    # print("Get Msg from " + sensor_id)
-    if sensor_id not in Global.members:
-        Global.members[sensor_id] = Member(sensor_id)
+def on_hb_data(id_, timestamp):
+    # print("Get Msg from " + id_)
+    if id_ not in Global.members:
+        Global.members[id_] = Member(id_)
         print("Current members: ", list(Global.members.keys()))
-        if (
-            Global.leader is None
-            or Global.leader is not None
-            and sensor_id > Global.leader
-        ):
+        if Global.leader is None or Global.leader is not None and id_ > Global.leader:
             init_election()
     with Global.lock:
-        Global.members[sensor_id].last_sent = timestamp
-        Global.members[sensor_id].last_updated = int(time.time())
+        Global.members[id_].last_sent = int(timestamp)
+        Global.members[id_].last_updated = int(time.time())
 
 
 def on_election_data(prefix, cand_id):
@@ -167,15 +161,20 @@ def on_election_data(prefix, cand_id):
             print("Leader is set: ", Global.leader)
 
 
+def on_annotator(id_, annotator_set_string):
+    Global.members[id_].annotators.update(annotator_set_string)
+    print("Received annotators set from " + id_)
+
+
 def on_dm(prefix, body):
     if prefix == "get_data":
-        annotator, sensor_id = body.split("\t")
+        annotator, key, sensor_id = body.split("\t")
         with Global.lock:
-            val = Global.members["SELF"].annotators.run(annotator)
+            val = Global.members["SELF"].annotators.run(annotator, key)
         print_and_pub(sensor_id, str(val), Global.publisher, "decide")
     elif prefix == "decide":
         val = eval(body)
-        if Global.buffer and len(Global.buffer)==6:
+        if Global.buffer and len(Global.buffer) == 6:
             Global.buffer[4].append(val)
             schedule(Global)
 
@@ -185,11 +184,13 @@ def detect_failure():
         to_remove_keys = []
         curr_time = int(time.time())
         reelect = False
-        for sensor, member in Global.members.items():
+        for id_, member in Global.members.items():
+            if id_ == "SELF":
+                continue
             if curr_time - member.last_updated > 10:
-                Global.members[sensor].failed = True
+                Global.members[id_].failed = True
             if curr_time - member.last_updated > 20 and member.failed:
-                to_remove_keys.append(sensor)
+                to_remove_keys.append(id_)
         for key in to_remove_keys:
             if key == Global.leader:
                 reelect = True
@@ -215,13 +216,13 @@ def main(args):
             Global.members["SELF"].annotators.add(
                 annotator, annotator_presets[annotator]
             )
+        else:
+            print(annotator + ": NOT found in annotator preset")
 
-    t1 = Thread(target=publisher_init, args=())
-    t2 = Thread(target=subscriber_init, args=())
-    t3 = Thread(target=detect_failure, args=())
-    t1.start()
-    t2.start()
-    t3.start()
+    async_run_after(0, publisher_init)
+    async_run_after(0, subscriber_init)
+    async_run_after(0, detect_failure)
+
     print("All threads started...")
     time.sleep(1000)
 

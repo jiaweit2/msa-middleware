@@ -10,7 +10,6 @@ import os
 import re
 import time
 from collections import deque
-from threading import Timer
 
 import numpy as np
 

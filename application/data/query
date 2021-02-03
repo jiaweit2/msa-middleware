@@ -1,3 +1,4 @@
+129.2,291.3
 /YOLO = Decision({
     "Human": person > 0.5,
     "NoHumanDetected": otherwise

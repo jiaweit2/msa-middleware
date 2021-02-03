@@ -7,15 +7,14 @@ def basic_cost_func(args):
     predicates, members = args
     # Find least-cost annotators owner
     annotators = {}  # -> [owner, cost]
-    for _id in members:
-        for annotator in members[_id].annotators.map:
+    for id_ in members:
+        for annotator in members[id_].annotators.map:
             # cost = complexity + delay
-            c = members[_id].annotators.map[annotator] + (
-                members[_id].last_updated - members[_id].last_sent
+            c = members[id_].annotators.map[annotator][1] + (
+                members[id_].last_updated - members[id_].last_sent
             )
             if annotator not in annotators or c < annotators[annotator][1]:
-                annotators[annotator] = c
-
+                annotators[annotator] = [id_, c]
     plan = {}  # predicate -> [(owner, annotator), ...]
     cost = {}  # predicate -> cost
     for k, v in predicates.items():
