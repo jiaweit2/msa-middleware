@@ -1,6 +1,6 @@
 import zmq
 import time
-from middleware.node.const import *
+from middleware.node.utils import *
 
 
 def publisher_init():
@@ -33,7 +33,7 @@ def subscribe():
 if __name__ == "__main__":
     """
     Query format:
-    {required skill A},{skill B}...
+    Lat,Long
     /Name = Decision({
         {conditions}
     })
@@ -44,9 +44,9 @@ if __name__ == "__main__":
         query += (
             lines[1].split("=")[0].strip()
             + "\t"
-            + lines[0].strip()
-            + "\t"
             + "".join(lines[1:])
+            + "\t"
+            + lines[0].strip()
         )
     publisher = publisher_init()
     print_and_pub("system", "Preparing to publish...", publisher)

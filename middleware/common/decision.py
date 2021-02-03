@@ -33,6 +33,8 @@ class Decision(Variable):
         predicates,
         freshness_p=DEFAULT_FRESHNESS_P,
         associated_vars=set(),
+        prob=dict(),
+        cost=dict(),
     ):
         super().__init__(name, freshness_p, associated_vars)
         self.decision_logic = decision_logic
@@ -60,8 +62,8 @@ class Decision(Variable):
                     self.vars_to_predicates[right] = set()
                 self.vars_to_predicates[right].add(k)
 
-        self.prob = dict()
-        self.cost = dict()
+        self.prob = prob
+        self.cost = cost
 
         self.request_tree = None
         self.resolver = None
@@ -74,20 +76,15 @@ class Decision(Variable):
     def set_resolver(self, func):
         self.resolver = func
 
-    def set_prob(self, prob):
-        # Expected format of given prob: { predicate_str: value } ex) { '/a/b == False': 0.5 }
-        # Expected output: { predicate_id: value } ex) { 'p0': 0.5 }
-        for predicate, prob_value in prob.items():
-            predicate = predicate.replace(" ", "")
-            for p_name, p_list in self.predicates.items():
-                if predicate == "".join(p_list):
-                    self.prob[p_name] = prob_value
+    def set_prob(self, predicate, prob_value):
+        self.prob[predicate] = prob_value
+        if prob_value == 1.0:
+            self.set_predicate_value(predicate, 1)
+        elif prob_value == 0.0:
+            self.set_predicate_value(predicate, 0)
 
-        for k, v in self.prob.items():
-            if v == 1.0:
-                self.set_predicate_value(k, 1)
-            elif v == 0.0:
-                self.set_predicate_value(k, 0)
+    def set_cost(self, predicate, cost_value):
+        self.cost[predicate] = cost_value
 
     def set_produce_var(self, func):
         self.produce_var = func
@@ -328,9 +325,10 @@ class Decision(Variable):
             node.right = TreeNode(right)
             self.construct(node.right, copy.deepcopy(assume_false))
 
-    def pick(self, decision_logic):
+    def pick(self, decision_logic=None):
+        if decision_logic is None:
+            decision_logic = self.decision_logic
         """Actual scheduling algorithm here"""
-
         if len(decision_logic) == 0:
             # logger.debug("Decision logic is empty")
             return None
@@ -386,7 +384,7 @@ class Decision(Variable):
 
         chosen_leaf_idx = leaf_cost.index(max(leaf_cost))
         chosen_leaf = decision_logic[chosen_subtree_idx][chosen_leaf_idx]
-
+        # print(decision_logic)
         return chosen_leaf
 
     def process(self):
@@ -405,7 +403,7 @@ class Decision(Variable):
 
 
 if __name__ == "__main__":
-    coa_validity = {"CoA1": "And(p1, p3)", "CoA2": "And(p2, p0)", "CoA3": "And(p4)"}
+    coa_validity = {"CoA1": "Or(p1, p3)", "CoA2": "And(p2, p0)", "CoA3": "otherwise"}
 
     predicates = {
         "p0": ["/temperature", ">=", "10"],
@@ -415,8 +413,18 @@ if __name__ == "__main__":
         "p4": ["/windSpeed", ">=", "70"],
     }
 
+    prob = {"p0": 0.5, "p1": 0.9, "p2": 0.7, "p3": 0.8, "p4": 0.1}
+
+    cost = {"p0": 1, "p1": 1, "p2": 1, "p3": 100, "p4": 300}
+
     d = Decision(
-        "/test", [["p0"], ["p1"], ["p2"], ["p3"], ["p4"]], coa_validity, predicates, 60
+        "/test",
+        [["p1", "p3"], ["p2", "p0"], ["p4"]],
+        coa_validity,
+        predicates,
+        60,
+        prob=prob,
+        cost=cost,
     )
     # d = Decision('test', [['p1'], ['p3'], ['p2'], ['p0'], ['p4']], coa_validity, predicates, 60)
     # print(d.request_tree)
@@ -425,16 +433,19 @@ if __name__ == "__main__":
     # d.set_predicate_value('p4', None)
     # print(d.value)
 
-    # d.set_var_value('/windSpeed', UNRESOLVABLE)
+    # d.set_var_value("/windSpeed", UNRESOLVABLE)
     # d.set_var_value('/precipitation', UNRESOLVABLE)
+
     # print(d.request_tree)
     # print(d.value)
     # print(d.get_fetch())
     # print(d.get_prefetch())
-    # print(d.coa_validity)
-    d.set_var_value("/precipitation", "50")
-    d.set_var_value("/temperature", "5")
-    d.set_var_value("/windSpeed", "50")
+
+    print(d.pick())
+    print("---------------------------!!!-------------------------")
+    d.set_var_value("/temperature", "0")
+    d.set_var_value("/precipitation", "0")
+    d.set_var_value("/windSpeed", "0")
 
     if d.get_value():
         print(d.get_value())

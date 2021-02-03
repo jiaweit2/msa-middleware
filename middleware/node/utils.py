@@ -1,76 +1,110 @@
+import time
+from threading import Thread
+
 import cv2
 from middleware.node.const import *
-from middleware.node.annotate import *
-from middleware.common.parser import AthenaParser
-from middleware.common.decision import Decision
+from middleware.preset.annotators import annotator_to_sensor
 
 
-def list_to_str(arr):
-    s = ""
-    for a in arr:
-        if s != "":
-            s += ","
-        s += str(a)
-    return s
+class Member:
+    def __init__(self, id_):
+        self.id = id_
+        self.failed = False
+        self.last_updated = 0
+        if id_ != "SELF":
+            self.last_updated = int(time.time())
+        self.last_sent = 0
+        self.annotators = AnnotatorSet()
 
 
-def get_latest_data(sensor_type):
-    if sensor_type == "Camera":
+class AnnotatorSet:
+    def __init__(self):
+        self.map = {}  # -> [func, cost] (func=None if remote)
+
+    def run(self, annotator, k):
+        if annotator in self.map:
+            # Get latest data
+            sensor = annotator_to_sensor[annotator]
+            data = get_sensor_data(sensor)
+            return (self.map[annotator][0](data))[k]
+        return None
+
+    def add(self, annotator, annotator_meta):
+        annotator_meta[1] = int(annotator_meta[1])
+        self.map[annotator] = annotator_meta
+
+    def remove(self, annotator):
+        del self.map[annotator]
+
+    # s: string output from __repr__()
+    def update(self, s):
+        if s:
+            for item in s.split(";"):
+                k, cost = item.split(",")
+                if k not in self.map:
+                    self.map[k] = [None, int(cost)]
+                elif cost < self.map[k][1]:
+                    self.map[k][1] = int(cost)
+
+    def __repr__(self):
+        s = ""
+        for k in self.map:
+            if s:
+                s += ";"
+            s += k + "," + str(self.map[k][1])
+        return s
+
+
+def get_sensor_data(sensor):
+    # Retrieve latest data from sensor
+    if sensor == "Camera":
         # image loading
         img = cv2.imread(CAM_DATA_PATH)
         img = cv2.resize(img, None, fx=0.4, fy=0.4)
         # height, width, channels = img.shape
         data = cv2.imencode(".jpg", img)[1].tobytes()
-        return YOLO_Annotate(data)
+        return data
+    elif sensor == "IR":
+        return ""
+    elif sensor == "SR":
+        return ""
 
 
-def post_process_coa(variables):
-    for var in variables:
-        if len(variables[var]) > 0 and variables[var][-1] != ")":
-            variables[var] = "And(" + variables[var] + ")"
+def post_process_coa(coas):
+    for coa in coas:
+        if len(coas[coa]) > 0 and coas[coa][-1] != ")" and coas[coa] != "otherwise":
+            coas[coa] = "And(" + coas[coa] + ")"
 
 
-def on_query(query, Global):
-    name, skills_req, input_str = query.split("\t")
-    skills_req = skills_req.split(",")
-    # Parse boolean expression of decision query
-    a = AthenaParser()
-    a.load_str(input_str)
-    decision_logic, coa_validity, predicates = a.variables[name][1:4]
-    post_process_coa(coa_validity)
-    print(coa_validity)
-    with Global.lock:
-        Global.buffer_query = [decision_logic, coa_validity, predicates]
+def async_run_after(t, func):
+    t = Thread(target=run_after, args=(t, func))
+    t.start()
 
-    # TODO: A better middleware algorithm to find the best suiting nodes
-    # Assume only one skill here in skills_req for now
-    skill = skills_req[0]
-    if skill not in Global.skills:
-        for sensor, member in Global.members.items():
-            if skill in member.skills:
-                print_and_pub(
-                    sensor, skill + "\t" + Global.curr_id, Global.publisher, "get_data"
-                )
-                break
+
+def run_after(t, func):
+    time.sleep(t)
+    func()
+
+
+def print_and_pub(topic, body, publisher, prefix=""):
+    if type(topic) is str:
+        btopic = topic.encode("utf-8")
     else:
-        annotated_data = get_latest_data(skill)
-        on_query_decide(annotated_data)
+        btopic = topic
+        topic = topic.decode("utf-8")
 
-
-def on_query_decide(annotated_data, Global):
-    if not Global.buffer_query:
-        return
-    decision_logic, coa_validity, predicates = Global.buffer_query
-    d = Decision("/query_res", decision_logic, coa_validity, predicates, 60)
-    variables = []
-    for p in predicates:
-        variables.append(predicates[p][0])
-    for var in annotated_data:
-        if var in variables:
-            d.set_var_value(var, annotated_data[var])
-    if d.get_value():
-        print_and_pub("query_result", d.get_value(), Global.publisher)
+    if type(prefix) is str:
+        bprefix = prefix.encode("utf-8")
     else:
-        print("Something is wrong with the decision model")
-    with Global.lock:
-        Global.buffer_query = None
+        bprefix = prefix
+
+        if prefix is not None:
+            prefix = prefix.decode("utf-8")
+
+    if type(body) is str:
+        bbody = body.encode("utf-8")
+    else:
+        bbody = body
+        body = body.decode("utf-8")
+
+    publisher.send_multipart([btopic, bprefix, bbody])
