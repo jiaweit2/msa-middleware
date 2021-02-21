@@ -10,6 +10,8 @@ from mininet.node import Node
 from mininet.cli import CLI
 from mininet.link import TCLink
 
+from config import *
+
 
 class SingleSwitchTopo(Topo):
     # "Single switch connected to n hosts."
@@ -19,9 +21,6 @@ class SingleSwitchTopo(Topo):
         for h in range(n):
             host = self.addHost("h%s" % (h + 1))
             self.addLink(host, switch, bw=10)
-
-
-AURORA_DIR = "/mnt/hgfs/Project/aurora-net-iobt-cra-site-server"
 
 
 def run():
@@ -38,7 +37,7 @@ def run():
 
     h4.cmd("../middleware/node/run.sh 0004 IR &")
     h1.cmd("../middleware/node/run.sh 0001 IR &")
-    h3.cmd("../middleware/node/run.sh 0003 YOLO &")
+    h3.cmd("../middleware/node/run.sh 0003 YOLO " + DARKNET_YOLO_DIR + "&")
     h2.cmd("../middleware/node/run.sh 0002 SR &")
 
     CLI(net)

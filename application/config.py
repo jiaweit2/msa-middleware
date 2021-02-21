@@ -1,0 +1,2 @@
+AURORA_DIR = ""
+DARKNET_YOLO_DIR = ""
