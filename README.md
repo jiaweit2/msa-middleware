@@ -1,7 +1,7 @@
 # MSA-Middleware
 
 ## Install
-Clone <a href="https://github.com/jiaweit2/aurora-net-iobt-cra-site-server.git">AURORA-NET</a>
+Clone <a href="https://github.com/jiaweit2/aurora-net-iobt-cra-site-server.git">AURORA-NET</a>, follow its instructions to install AURORA-NET.
 
 Clone the middleware, go to the directory:
 ```
