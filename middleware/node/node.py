@@ -115,8 +115,8 @@ def subscriber_init():
         if prefix != Global.curr_id:
             # print("Received: [%s] %s" % (topic, prefix))
             if topic == "heartbeat":
-                total_bytes = sum(map(len, message))
-                on_hb_data(prefix, body, total_bytes)
+                total_bits = sum(map(len, message)) * 8 / 1000000  # unit: mb
+                on_hb_data(prefix, body, total_bits)
             elif topic == "election":
                 on_election_data(prefix, body)
             elif topic == "annotator":
@@ -128,7 +128,7 @@ def subscriber_init():
             on_query(body, Global)
 
 
-def on_hb_data(id_, timestamp, total_bytes):
+def on_hb_data(id_, timestamp, total_bits):
     # print("Get Msg from " + id_)
     curr_ts = time.time()
     if id_ not in Global.members:
@@ -140,13 +140,14 @@ def on_hb_data(id_, timestamp, total_bytes):
         Global.members[id_].last_sent = float(timestamp)
         Global.members[id_].last_updated = round(curr_ts, PRECESION)
         Global.members[id_].throughput = round(
-            total_bytes
+            total_bits
             / max(
                 Global.members[id_].last_updated - Global.members[id_].last_sent,
                 0.1 ** PRECESION,
             ),
             PRECESION,
         )
+        print(id_, Global.members[id_].throughput)
 
 
 def on_election_data(prefix, cand_id):
