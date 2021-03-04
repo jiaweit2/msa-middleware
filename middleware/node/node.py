@@ -138,8 +138,12 @@ def on_hb_data(id_, timestamp, total_bits):
     with Global.lock:
         Global.members[id_].last_sent = float(timestamp)
         Global.members[id_].last_updated = round(time.time(), 2)
-        Global.members[id_].throughput = total_bits / max(
-            Global.members[id_].last_updated - Global.members[id_].last_sent, 0.01
+        Global.members[id_].throughput = round(
+            total_bits
+            / max(
+                Global.members[id_].last_updated - Global.members[id_].last_sent, 0.01
+            ),
+            2,
         )
         print("Thoughput", id_, Global.members[id_].throughput)
 
