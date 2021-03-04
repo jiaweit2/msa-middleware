@@ -147,7 +147,6 @@ def on_hb_data(id_, timestamp, total_bytes):
             ),
             PRECESION,
         )
-        print(id_, Global.members[id_].throughput)
 
 
 def on_election_data(prefix, cand_id):
