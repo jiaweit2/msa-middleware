@@ -83,7 +83,7 @@ def publisher_init():
     while True:
         print_and_pub(
             "heartbeat",
-            str(round(time.time(), 2)),
+            str(round(time.time(), 5)),
             Global.publisher,
             Global.curr_id,
         )
@@ -137,13 +137,14 @@ def on_hb_data(id_, timestamp, total_bits):
             init_election()
     with Global.lock:
         Global.members[id_].last_sent = float(timestamp)
-        Global.members[id_].last_updated = round(time.time(), 2)
+        Global.members[id_].last_updated = round(time.time(), 5)
         Global.members[id_].throughput = round(
             total_bits
             / max(
-                Global.members[id_].last_updated - Global.members[id_].last_sent, 0.01
+                Global.members[id_].last_updated - Global.members[id_].last_sent,
+                0.00001,
             ),
-            2,
+            5,
         )
         print("Thoughput", id_, Global.members[id_].throughput)
 
