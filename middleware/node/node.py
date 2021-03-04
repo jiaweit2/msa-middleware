@@ -109,6 +109,7 @@ def subscriber_init():
 
     while True:
         message = subscriber.recv_multipart()
+        print(message)
         topic = message[0].decode("utf-8")
         prefix = message[1].decode("utf-8")
         body = message[2].decode("utf-8")
