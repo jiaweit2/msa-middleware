@@ -130,6 +130,7 @@ def subscriber_init():
 
 def on_hb_data(id_, timestamp, total_bytes):
     # print("Get Msg from " + id_)
+    curr_ts = time.time()
     if id_ not in Global.members:
         Global.members[id_] = Member(id_)
         print("Current members: ", list(Global.members.keys()))
@@ -137,7 +138,7 @@ def on_hb_data(id_, timestamp, total_bytes):
             init_election()
     with Global.lock:
         Global.members[id_].last_sent = float(timestamp)
-        Global.members[id_].last_updated = round(time.time(), PRECESION)
+        Global.members[id_].last_updated = round(curr_ts, PRECESION)
         Global.members[id_].throughput = round(
             total_bytes
             / max(
@@ -146,7 +147,7 @@ def on_hb_data(id_, timestamp, total_bytes):
             ),
             PRECESION,
         )
-        print(Global.members[id_].throughput)
+        print(id_, Global.members[id_].throughput)
 
 
 def on_election_data(prefix, cand_id):
