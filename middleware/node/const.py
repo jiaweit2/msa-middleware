@@ -8,3 +8,5 @@ CAM_DATA_PATH = "./application/data/sample.jpg"
 CFG_URL = "./darknet/cfg/yolov3.cfg"
 WEIGHT_URL = "./darknet/yolov3.weights"
 CLASS_URL = "./darknet/data/coco.names"
+
+PRECESION = 30
