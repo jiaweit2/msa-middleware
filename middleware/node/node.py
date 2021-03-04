@@ -83,7 +83,7 @@ def publisher_init():
     while True:
         print_and_pub(
             "heartbeat",
-            str(int(time.time())),
+            str(round(time.time(), 2)),
             Global.publisher,
             Global.curr_id,
         )
@@ -109,14 +109,14 @@ def subscriber_init():
 
     while True:
         message = subscriber.recv_multipart()
-        print(message)
         topic = message[0].decode("utf-8")
         prefix = message[1].decode("utf-8")
         body = message[2].decode("utf-8")
         if prefix != Global.curr_id:
             # print("Received: [%s] %s" % (topic, prefix))
             if topic == "heartbeat":
-                on_hb_data(prefix, body)
+                total_bits = sum(map(len, message)) * 8
+                on_hb_data(prefix, body, total_bits)
             elif topic == "election":
                 on_election_data(prefix, body)
             elif topic == "annotator":
@@ -128,7 +128,7 @@ def subscriber_init():
             on_query(body, Global)
 
 
-def on_hb_data(id_, timestamp):
+def on_hb_data(id_, timestamp, total_bits):
     # print("Get Msg from " + id_)
     if id_ not in Global.members:
         Global.members[id_] = Member(id_)
@@ -136,8 +136,12 @@ def on_hb_data(id_, timestamp):
         if Global.leader is None or Global.leader is not None and id_ > Global.leader:
             init_election()
     with Global.lock:
-        Global.members[id_].last_sent = int(timestamp)
-        Global.members[id_].last_updated = int(time.time())
+        Global.members[id_].last_sent = float(timestamp)
+        Global.members[id_].last_updated = round(time.time(), 2)
+        Global.members[id_].throughput = total_bits / (
+            Global.members[id_].last_updated - Global.members[id_].last_sent
+        )
+        print("Thoughput", id_, Global.members[id_].throughput)
 
 
 def on_election_data(prefix, cand_id):

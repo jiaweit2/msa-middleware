@@ -14,6 +14,7 @@ class Member:
         if id_ != "SELF":
             self.last_updated = int(time.time())
         self.last_sent = 0
+        self.throughput = 0
         self.annotators = AnnotatorSet()
 
 
