@@ -140,6 +140,7 @@ def on_hb_data(id_, timestamp, total_bits):
         Global.members[id_].last_updated = round(time.time(), 5)
         Global.members[id_].throughput = round(
             total_bits
+            / 8
             / max(
                 Global.members[id_].last_updated - Global.members[id_].last_sent,
                 0.00001,
