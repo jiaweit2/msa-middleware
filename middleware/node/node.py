@@ -115,7 +115,7 @@ def subscriber_init():
         if prefix != Global.curr_id:
             # print("Received: [%s] %s" % (topic, prefix))
             if topic == "heartbeat":
-                total_bits = sum(map(len, message)) * 8
+                total_bits = sum(map(len, message))
                 on_hb_data(prefix, body, total_bits)
             elif topic == "election":
                 on_election_data(prefix, body)
@@ -140,7 +140,6 @@ def on_hb_data(id_, timestamp, total_bits):
         Global.members[id_].last_updated = round(time.time(), 5)
         Global.members[id_].throughput = round(
             total_bits
-            / 8
             / max(
                 Global.members[id_].last_updated - Global.members[id_].last_sent,
                 0.00001,
