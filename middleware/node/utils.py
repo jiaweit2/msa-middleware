@@ -1,5 +1,6 @@
 import time
 from threading import Thread
+from zmq import SNDMORE
 
 import cv2
 from middleware.node.const import *
@@ -14,8 +15,11 @@ class Member:
         if id_ != "SELF":
             self.last_updated = int(time.time())
         self.last_sent = 0
-        self.throughput = 0
         self.annotators = AnnotatorSet()
+
+        # Calculate throughput
+        self.start_ts = 0
+        self.throughput = 0
 
 
 class AnnotatorSet:
@@ -109,3 +113,25 @@ def print_and_pub(topic, body, publisher, prefix=""):
         body = body.decode("utf-8")
 
     publisher.send_multipart([btopic, bprefix, bbody])
+
+
+def measure_throughput(Global, receiver, is_first_trip, packets=None):
+    publisher, sender = Global.publisher, Global.curr_id
+
+    if not packets:
+        packets = [b"x" * PACKETSIZE for i in range(PACKETCOUNT)]
+    packets_size = sum(map(len, packets))
+    publisher.send(("bw-" + receiver).encode("utf-8"), SNDMORE)
+    if not isinstance(is_first_trip, bytes):
+        is_first_trip = "true" if is_first_trip else "false"
+    publisher.send((sender + "\t" + is_first_trip).encode("utf-8"), SNDMORE)
+
+    if is_first_trip == "true":
+        with Global.lock:
+            Global.members[receiver].start_ts = round(time.time(), PRECESION)
+
+    for i in range(len(packets)):
+        if i == len(packets) - 1:
+            publisher.send(packets[i])
+        else:
+            publisher.send(packets[i], SNDMORE)

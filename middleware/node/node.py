@@ -1,6 +1,6 @@
 import argparse
 from queue import Queue
-from threading import RLock
+from threading import RLock, Condition
 
 import zmq
 from middleware.brain.optimizer import Optimizer
@@ -21,8 +21,10 @@ class Global:
 
     lock = RLock()
     lock_election = RLock()
+    cv = Condition()
 
     buffer = None
+    msg_buffer = []
 
 
 def call_election(cand=None):
@@ -98,7 +100,14 @@ def subscriber_init():
     print("Connecting to: %s" % SUB_URL)
     subscriber.connect(SUB_URL)
 
-    topics = ["heartbeat", "election", "query", "annotator", Global.curr_id]
+    topics = [
+        "heartbeat",
+        "election",
+        "query",
+        "annotator",
+        Global.curr_id,
+        "bw-" + Global.curr_id,
+    ]
     for topic in topics:
         if type(topic) is str:
             topic = topic.encode("utf-8")
@@ -107,49 +116,64 @@ def subscriber_init():
         subscriber.setsockopt(zmq.SUBSCRIBE, topic)
         print('Subscribed to topic "%s"' % (topic.decode("utf-8")))
 
+    async_run_after(0, message_buffer)
+
     while True:
-        message = subscriber.recv()
-        print(message)
-        continue
-        topic = message[0].decode("utf-8")
+        message = subscriber.recv_multipart()
+        curr_ts = round(time.time(), PRECESION)
+
+        message[0] = message[0].decode("utf-8")
+        if message[0] == "bw-" + Global.curr_id:
+            message = message[:2] + [message[2:]]
+
+        # Add to message buffer and notify a new message
+        with Global.lock:
+            Global.msg_buffer.append(message + [curr_ts])
+        with Global.cv:
+            Global.cv.notify()
+
+
+def message_buffer():
+    while True:
+        with Global.cv:
+            while len(Global.msg_buffer) == 0:
+                Global.cv.wait()
+        with Global.lock:
+            message = Global.msg_buffer.pop(0)
+        topic = message[0]
         prefix = message[1].decode("utf-8")
-        body = message[2].decode("utf-8")
+        body = message[2]
+        if isinstance(body, bytes):
+            body = body.decode("utf-8")
+        curr_ts = message[3]
         if prefix != Global.curr_id:
             # print("Received: [%s] %s" % (topic, prefix))
             if topic == "heartbeat":
-                total_bits = sum(map(len, message)) * 8 / 1000000  # unit: mb
-                on_hb_data(prefix, body, total_bits)
+                on_hb_data(prefix, body, curr_ts)
             elif topic == "election":
                 on_election_data(prefix, body)
             elif topic == "annotator":
                 on_annotator(prefix, body)
             elif topic == Global.curr_id:
                 on_dm(prefix, body)
+            elif topic[:2] == "bw":
+                on_bw(curr_ts, prefix, body)
         elif topic == "query":
             # Current node is assigned to process a query
             on_query(body, Global)
 
 
-def on_hb_data(id_, timestamp, total_bits):
+def on_hb_data(id_, timestamp, curr_ts):
     # print("Get Msg from " + id_)
-    curr_ts = time.time()
     if id_ not in Global.members:
         Global.members[id_] = Member(id_)
         print("Current members: ", list(Global.members.keys()))
         if Global.leader is None or Global.leader is not None and id_ > Global.leader:
             init_election()
+        measure_throughput(Global, id_, True)
     with Global.lock:
         Global.members[id_].last_sent = float(timestamp)
-        Global.members[id_].last_updated = round(curr_ts, PRECESION)
-        Global.members[id_].throughput = round(
-            total_bits
-            / max(
-                Global.members[id_].last_updated - Global.members[id_].last_sent,
-                0.1 ** PRECESION,
-            ),
-            PRECESION,
-        )
-        print(id_, Global.members[id_].throughput)
+        Global.members[id_].last_updated = curr_ts
 
 
 def on_election_data(prefix, cand_id):
@@ -190,6 +214,18 @@ def on_dm(prefix, body):
         if Global.buffer and len(Global.buffer) == 6:
             Global.buffer[4].append(val)
             schedule(Global)
+
+
+def on_bw(arrival_time, prefix, packets):
+    to, is_first_trip = prefix.split("\t")
+    if is_first_trip == "false":  # throughput test finish
+        rtt = arrival_time - Global.members[to].start_ts
+        packets_size = sum(map(len, packets)) / 125000.0
+        with Global.lock:
+            Global.members[to].throughput = round(packets_size / rtt, PRECESION)
+        print("Throughput (Mb/s)", Global.members[to].throughput)
+    else:
+        measure_throughput(Global, to, False, packets)
 
 
 def detect_failure():
