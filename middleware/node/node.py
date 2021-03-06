@@ -1,5 +1,4 @@
 import argparse
-from queue import Queue
 from threading import RLock, Condition
 
 import zmq
@@ -220,17 +219,16 @@ def on_dm(prefix, body):
 
 def on_bw(arrival_time, prefix, packets):
     to, is_first_trip, rtt, start_ts, packets_size = prefix.split("\t")
-    rtt = float(rtt) + arrival_time - float(start_ts)
     if is_first_trip == "false":  # throughput test finish
         packets_size = float(packets_size)
         with Global.lock:
-            Global.members[to].throughput = round(packets_size / rtt, PRECESION)
+            Global.members[to].throughput = round(packets_size / float(rtt), PRECESION)
         print(
             Global.curr_id + "-" + to + ": Throughput (Mb/s)",
             Global.members[to].throughput,
-            packets_size,
         )
     else:
+        rtt = arrival_time - float(start_ts)
         packets_size = sum(map(len, packets)) / 125000.0
         print_and_pub(
             "bw-" + to,
