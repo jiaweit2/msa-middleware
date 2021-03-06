@@ -21,6 +21,7 @@ class Global:
 
     lock = RLock()
     lock_election = RLock()
+    lock_msg = RLock()
     cv = Condition()
 
     buffer = None
@@ -66,13 +67,14 @@ def publisher_init():
     # Create a publisher socket
     Global.publisher = context.socket(zmq.PUB)
     print("Connecting to: %s" % PUB_URL)
+
     Global.publisher.connect(PUB_URL)
     print_and_pub("system", "Preparing to publish...", Global.publisher)
     time.sleep(3)
 
     # Tell others my annotators
     async_run_after(
-        6,
+        7,
         lambda: print_and_pub(
             "annotator",
             str(Global.members["SELF"].annotators),
@@ -98,6 +100,7 @@ def subscriber_init():
     # Create a subscriber socket
     subscriber = context.socket(zmq.SUB)
     print("Connecting to: %s" % SUB_URL)
+
     subscriber.connect(SUB_URL)
 
     topics = [
@@ -122,12 +125,8 @@ def subscriber_init():
         message = subscriber.recv_multipart()
         curr_ts = round(time.time(), PRECESION)
 
-        message[0] = message[0].decode("utf-8")
-        if message[0] == "bw-" + Global.curr_id:
-            message = message[:2] + [message[2:]]
-
         # Add to message buffer and notify a new message
-        with Global.lock:
+        with Global.lock_msg:
             Global.msg_buffer.append(message + [curr_ts])
         with Global.cv:
             Global.cv.notify()
@@ -138,9 +137,12 @@ def message_buffer():
         with Global.cv:
             while len(Global.msg_buffer) == 0:
                 Global.cv.wait()
-        with Global.lock:
+        with Global.lock_msg:
             message = Global.msg_buffer.pop(0)
-        topic = message[0]
+
+        topic = message[0].decode("utf-8")
+        if topic == "bw-" + Global.curr_id:
+            message = message[:2] + [message[2:-1], message[-1]]
         prefix = message[1].decode("utf-8")
         body = message[2]
         if isinstance(body, bytes):
@@ -170,7 +172,7 @@ def on_hb_data(id_, timestamp, curr_ts):
         print("Current members: ", list(Global.members.keys()))
         if Global.leader is None or Global.leader is not None and id_ > Global.leader:
             init_election()
-        measure_throughput(Global, id_, True)
+        measure_throughput(Global, id_)
     with Global.lock:
         Global.members[id_].last_sent = float(timestamp)
         Global.members[id_].last_updated = curr_ts
@@ -217,15 +219,33 @@ def on_dm(prefix, body):
 
 
 def on_bw(arrival_time, prefix, packets):
-    to, is_first_trip = prefix.split("\t")
+    to, is_first_trip, rtt, start_ts, packets_size = prefix.split("\t")
+    rtt = float(rtt) + arrival_time - float(start_ts)
     if is_first_trip == "false":  # throughput test finish
-        rtt = arrival_time - Global.members[to].start_ts
-        packets_size = sum(map(len, packets)) / 125000.0
+        packets_size = float(packets_size)
         with Global.lock:
             Global.members[to].throughput = round(packets_size / rtt, PRECESION)
-        print("Throughput (Mb/s)", Global.members[to].throughput)
+        print(
+            Global.curr_id + "-" + to + ": Throughput (Mb/s)",
+            Global.members[to].throughput,
+            packets_size,
+        )
     else:
-        measure_throughput(Global, to, False, packets)
+        packets_size = sum(map(len, packets)) / 125000.0
+        print_and_pub(
+            "bw-" + to,
+            "",
+            Global.publisher,
+            Global.curr_id
+            + "\t"
+            + "false"
+            + "\t"
+            + str(rtt)
+            + "\t"
+            + str(round(time.time(), PRECESION))
+            + "\t"
+            + str(packets_size),
+        )
 
 
 def detect_failure():
@@ -236,9 +256,9 @@ def detect_failure():
         for id_, member in Global.members.items():
             if id_ == "SELF":
                 continue
-            if curr_time - member.last_updated > 10:
+            if curr_time - member.last_updated > 20:
                 Global.members[id_].failed = True
-            if curr_time - member.last_updated > 20 and member.failed:
+            if curr_time - member.last_updated > 40 and member.failed:
                 to_remove_keys.append(id_)
         for key in to_remove_keys:
             if key == Global.leader:
@@ -251,7 +271,7 @@ def detect_failure():
                 Global.election_status = "NOLEADER"
                 Global.leader = None
             init_election()
-        time.sleep(10)
+        time.sleep(20)
 
 
 def main(args):

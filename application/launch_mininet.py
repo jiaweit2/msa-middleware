@@ -21,13 +21,13 @@ class SingleSwitchTopo(Topo):
         # Python's range(N) generates 0..N-1
         for h in range(n):
             host = self.addHost("h%s" % (h + 1))
-            self.addLink(host, switch, bw=10, delay="5ms")
+            # self.addLink(host, switch, bw=10)
 
 
 def run():
     # "Create and test a simple network"
     topo = SingleSwitchTopo(n=4)
-    net = Mininet(topo=topo, host=CPULimitedHost, link=TCLink)
+    net = Mininet(topo=topo, link=TCLink)
     net.start()
     print("Simulation Begin")
 

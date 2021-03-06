@@ -10,5 +10,5 @@ WEIGHT_URL = "./darknet/yolov3.weights"
 CLASS_URL = "./darknet/data/coco.names"
 
 PRECESION = 10
-PACKETSIZE = 1024
-PACKETCOUNT = 100
+PACKETSIZE = 1000
+PACKETCOUNT = 1000

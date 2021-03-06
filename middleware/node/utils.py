@@ -18,7 +18,6 @@ class Member:
         self.annotators = AnnotatorSet()
 
         # Calculate throughput
-        self.start_ts = 0
         self.throughput = 0
 
 
@@ -115,23 +114,18 @@ def print_and_pub(topic, body, publisher, prefix=""):
     publisher.send_multipart([btopic, bprefix, bbody])
 
 
-def measure_throughput(Global, receiver, is_first_trip, packets=None):
+def measure_throughput(Global, receiver):
     publisher, sender = Global.publisher, Global.curr_id
+    ts = str(round(time.time(), PRECESION))
 
-    if not packets:
-        packets = [b"x" * PACKETSIZE for i in range(PACKETCOUNT)]
-    packets_size = sum(map(len, packets))
     publisher.send(("bw-" + receiver).encode("utf-8"), SNDMORE)
-    if not isinstance(is_first_trip, bytes):
-        is_first_trip = "true" if is_first_trip else "false"
-    publisher.send((sender + "\t" + is_first_trip).encode("utf-8"), SNDMORE)
+    publisher.send(
+        (sender + "\t" + "true" + "\t0.0\t" + ts + "\t ").encode("utf-8"),
+        SNDMORE,
+    )
 
-    if is_first_trip == "true":
-        with Global.lock:
-            Global.members[receiver].start_ts = round(time.time(), PRECESION)
-
-    for i in range(len(packets)):
-        if i == len(packets) - 1:
-            publisher.send(packets[i])
+    for i in range(PACKETCOUNT):
+        if i == PACKETCOUNT - 1:
+            publisher.send(b"x" * PACKETSIZE)
         else:
-            publisher.send(packets[i], SNDMORE)
+            publisher.send(b"x" * PACKETSIZE, SNDMORE)
