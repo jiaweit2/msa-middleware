@@ -33,3 +33,9 @@ Start the middleware in `msa-middleware/application/`
 ```
 sudo python launch_mininet.py
 ```
+
+## Example Application
+Run `commander.py` on any host in mininet:
+```
+h1 python -u application/commander.py
+```
