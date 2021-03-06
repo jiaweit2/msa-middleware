@@ -16,11 +16,17 @@ pip install -e
 ``` 
 
 ### Environment Variables
-Add some paths in `venv/bin/activate`:
+#### Add some variables in `venv/bin/activate` as follows
+Add mininet path to PYTHONPATH:
 ```
 export PYTHONPATH=$PYTHONPATH:/path/to/mininet
 ```
-Also, config the middleware variables in `msa-middleware/application/config.py` before running.
+Add dependent paths for YOLO(annotator):
+```
+export CFG_URL = "path/to/darknet/cfg/yolov3.cfg"
+export WEIGHT_URL = "path/to/darknet/yolov3-tiny.weights"
+export CLASS_URL = "path/to/darknet/data/coco.names"
+```
 
 ## Run
 Start Virtualenv

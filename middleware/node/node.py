@@ -5,7 +5,8 @@ import zmq
 from middleware.brain.optimizer import Optimizer
 from middleware.node.query import *
 from middleware.node.utils import *
-from middleware.preset.annotators import annotator_presets, annotator_to_sensor
+from middleware.preset.annotators import annotator_presets
+from middleware.node.sensor_manager import AnnotatorSet
 
 
 class Global:
@@ -25,6 +26,20 @@ class Global:
 
     buffer = None
     msg_buffer = []
+
+
+class Member:
+    def __init__(self, id_):
+        self.id = id_
+        self.failed = False
+        self.last_updated = 0
+        if id_ != "SELF":
+            self.last_updated = int(time.time())
+        self.last_sent = 0
+        self.annotators = AnnotatorSet()
+
+        # Calculate throughput
+        self.throughput = 0
 
 
 def call_election(cand=None):

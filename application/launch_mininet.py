@@ -11,9 +11,6 @@ from mininet.link import TCLink
 from mininet.node import OVSSwitch, Controller, RemoteController
 
 
-from config import *
-
-
 class SingleSwitchTopo(Topo):
     # "Single switch connected to n hosts."
     def build(self, n=2):
