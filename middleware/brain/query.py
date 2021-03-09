@@ -1,7 +1,7 @@
 from middleware.common.decision import Decision
 from middleware.common.parser import AthenaParser
 from middleware.node.utils import *
-from middleware.node.const import *
+from middleware.node.sensor_manager import get_sensor_data
 
 
 def on_query(query, Global):
@@ -39,10 +39,10 @@ def schedule(Global):
             var = predicates[predicate][0]
             for owner, annotator in plan[predicate]:
                 if owner == "SELF":
-                    with Global.lock:
-                        vals.append(
-                            Global.members[owner].annotators.run(annotator, var)
-                        )
+                    data = get_sensor_data(annotator)
+                    vals.append(
+                        Global.members["SELF"].annotators.run(annotator, data, var)
+                    )
                 else:
                     print_and_pub(
                         owner,

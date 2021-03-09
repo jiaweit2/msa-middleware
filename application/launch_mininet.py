@@ -40,10 +40,10 @@ def run():
     h1.cmd("cd ..")
     time.sleep(2)
 
-    h4.cmd("python -u middleware/node/node.py --id 0004 --annotators IR &")
-    h1.cmd("python -u middleware/node/node.py --id 0001 --annotators IR &")
+    h4.cmd("python -u middleware/node/node.py --id 0004 --annotators NUL &")
+    h1.cmd("python -u middleware/node/node.py --id 0001 --annotators NUL &")
     h3.cmd("python -u middleware/node/node.py --id 0003 --annotators YOLO &")
-    h2.cmd("python -u middleware/node/node.py --id 0002 --annotators SR &")
+    h2.cmd("python -u middleware/node/node.py --id 0002 --annotators NUL &")
 
     CLI(net)
     print("Simulation End")

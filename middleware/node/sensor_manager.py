@@ -1,19 +1,16 @@
 import cv2
 
 from middleware.preset.annotators import annotator_to_sensor
+from middleware.node.const import *
 
 
 class AnnotatorSet:
     def __init__(self):
         self.map = {}  # -> [func, cost] (func=None if remote)
 
-    def run(self, annotator, k):
-        if annotator in self.map:
-            # Get latest data
-            sensor = annotator_to_sensor[annotator]
-            data = get_sensor_data(sensor)
-            return (self.map[annotator][0](data))[k]
-        return None
+    def run(self, annotator, data, k):
+        annotated = self.get_annotated(annotator, data)
+        return annotated[k] if k in annotated else None
 
     def add(self, annotator, annotator_meta):
         annotator_meta[1] = int(annotator_meta[1])
@@ -32,6 +29,11 @@ class AnnotatorSet:
                 elif cost < self.map[k][1]:
                     self.map[k][1] = int(cost)
 
+    def get_annotated(self, annotator, data):
+        if annotator in self.map:
+            return self.map[annotator][0](data)
+        return {}
+
     def __repr__(self):
         s = ""
         for k in self.map:
@@ -41,16 +43,17 @@ class AnnotatorSet:
         return s
 
 
-def get_sensor_data(sensor):
+def get_sensor_data(annotator):
     # Retrieve latest data from sensor
-    if sensor == "Camera":
+    sensor = annotator_to_sensor[annotator]
+    if sensor == Sensor.CAM:
         # image loading
         img = cv2.imread(CAM_DATA_PATH)
         img = cv2.resize(img, None, fx=0.4, fy=0.4)
         # height, width, channels = img.shape
         data = cv2.imencode(".jpg", img)[1].tobytes()
         return data
-    elif sensor == "IR":
+    elif sensor == Sensor.IR:
         return ""
-    elif sensor == "SR":
+    elif sensor == Sensor.SR:
         return ""

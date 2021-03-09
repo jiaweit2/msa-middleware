@@ -8,7 +8,7 @@ def YOLO(data):
 
     nparr = np.frombuffer(data, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    net = cv2.dnn.readNet(os.environ["WEIGHT_URL"], os.environ["CFG_URL"])
+    net = cv2.dnn.readNetFromDarknet(os.environ["CFG_URL"], os.environ["WEIGHT_URL"])
     classes = []
     with open(os.environ["CLASS_URL"], "r") as f:
         classes = [line.strip() for line in f.readlines()]
@@ -25,6 +25,7 @@ def YOLO(data):
     )
     net.setInput(blob)
     outputs = net.forward(output_layers)
+    print(outputs)
     res = {}
     for output in outputs:
         for detect in output:
@@ -45,4 +46,13 @@ def SR(data):
 
 
 annotator_presets = {"YOLO": [YOLO, 5], "IR": [IR, 2], "SR": [SR, 2]}
-annotator_to_sensor = {"YOLO": "Camera", "IR": "Infrared", "SR": "Sonar"}
+annotator_to_sensor = {"YOLO": Sensor.CAM, "IR": Sensor.IR, "SR": Sensor.SR}
+
+if __name__ == "__main__":
+    import cv2
+
+    img = cv2.imread(CAM_DATA_PATH)
+    img = cv2.resize(img, None, fx=0.4, fy=0.4)
+    # height, width, channels = img.shape
+    data = cv2.imencode(".jpg", img)[1].tobytes()
+    print(YOLO(data))

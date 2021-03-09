@@ -3,10 +3,10 @@ from threading import RLock, Condition
 
 import zmq
 from middleware.brain.optimizer import Optimizer
-from middleware.node.query import *
+from middleware.brain.query import *
 from middleware.node.utils import *
 from middleware.preset.annotators import annotator_presets
-from middleware.node.sensor_manager import AnnotatorSet
+from middleware.node.sensor_manager import *
 
 
 class Global:
@@ -38,7 +38,7 @@ class Member:
         self.last_sent = 0
         self.annotators = AnnotatorSet()
 
-        # Calculate throughput
+        # Approximate throughput
         self.throughput = 0
 
 
@@ -222,8 +222,8 @@ def on_annotator(id_, annotator_set_string):
 def on_dm(prefix, body):
     if prefix == "get_data":
         annotator, key, sensor_id = body.split("\t")
-        with Global.lock:
-            val = Global.members["SELF"].annotators.run(annotator, key)
+        data = get_sensor_data(annotator)
+        val = Global.members["SELF"].annotators.run(annotator, data, key)
         print_and_pub(sensor_id, str(val), Global.publisher, "decide")
     elif prefix == "decide":
         val = eval(body)
