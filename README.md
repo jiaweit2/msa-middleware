@@ -14,7 +14,7 @@ python3 -m venv venv
 ```
 Then install the packages:
 ```
-pip install -e
+pip install -r requirements.txt 
 ``` 
 
 ### Environment Variables
