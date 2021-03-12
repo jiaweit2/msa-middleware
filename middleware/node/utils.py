@@ -3,6 +3,7 @@ from threading import Thread
 from zmq import SNDMORE
 
 from middleware.node.const import *
+from middleware.preset.annotators import annotator_to_sensor
 
 
 def post_process_coa(coas):
@@ -60,3 +61,14 @@ def measure_throughput(Global, receiver):
             publisher.send(b"x" * PACKETSIZE)
         else:
             publisher.send(b"x" * PACKETSIZE, SNDMORE)
+
+
+def get_sensor_data(annotator, Global):
+    # Retrieve latest data from sensor
+    sensor = annotator_to_sensor[annotator]
+    if sensor == Sensor.CAM:
+        return [Global.cam_manager.snapshot(), Global.cam_manager.objects]
+    elif sensor == Sensor.IR:
+        return ""
+    elif sensor == Sensor.SR:
+        return ""

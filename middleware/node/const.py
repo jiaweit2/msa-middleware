@@ -5,7 +5,6 @@ SUB_URL = "tcp://10.0.0.1:9102"
 ELECTION_RES_TIMEOUT = 5
 ELECTION_WAIT_TIMEOUT = 12
 CAM_DATA_PATH = "./application/data/sample.jpg"
-CACHE_DIR_PATH = "./cache/"
 
 PRECESION = 10
 PACKETSIZE = 1000

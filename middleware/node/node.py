@@ -4,9 +4,9 @@ from threading import RLock, Condition
 import zmq
 from middleware.brain.optimizer import Optimizer
 from middleware.brain.query import *
+from middleware.brain.cam_manager import CamManager
 from middleware.node.utils import *
-from middleware.preset.annotators import annotator_presets
-from middleware.node.sensor_manager import *
+from middleware.preset.annotators import *
 
 
 class Global:
@@ -15,6 +15,7 @@ class Global:
     members = {}
     # If no custom function, use default optimizer
     optimizer = Optimizer()
+    cam_manager = None
 
     leader = None
     election_status = "NOLEADER"
@@ -35,11 +36,50 @@ class Member:
         self.last_updated = 0
         if id_ != "SELF":
             self.last_updated = int(time.time())
-        self.last_sent = 0
         self.annotators = AnnotatorSet()
 
         # Approximate throughput
-        self.throughput = 0
+        self.throughput = 100
+
+
+class AnnotatorSet:
+    def __init__(self):
+        self.map = {}  # -> [func, cost] (func=None if remote)
+
+    def run(self, annotator, data, k):
+        # TODO: Offloading here
+        annotated = self.get_annotated(annotator, data)
+        return annotated[k] if k in annotated else None
+
+    def add(self, annotator, annotator_meta):
+        annotator_meta[1] = int(annotator_meta[1])
+        self.map[annotator] = annotator_meta
+
+    def remove(self, annotator):
+        del self.map[annotator]
+
+    # s: string output from __repr__()
+    def update(self, s):
+        if s:
+            for item in s.split(";"):
+                k, cost = item.split(",")
+                if k not in self.map:
+                    self.map[k] = [None, int(cost)]
+                elif cost < self.map[k][1]:
+                    self.map[k][1] = int(cost)
+
+    def get_annotated(self, annotator, data):
+        if annotator in self.map:
+            return self.map[annotator][0](data)
+        return {}
+
+    def __repr__(self):
+        s = ""
+        for k in self.map:
+            if s:
+                s += ";"
+            s += k + "," + str(self.map[k][1])
+        return s
 
 
 def call_election(cand=None):
@@ -188,7 +228,6 @@ def on_hb_data(id_, timestamp, curr_ts):
             init_election()
         measure_throughput(Global, id_)
     with Global.lock:
-        Global.members[id_].last_sent = float(timestamp)
         Global.members[id_].last_updated = curr_ts
 
 
@@ -222,7 +261,7 @@ def on_annotator(id_, annotator_set_string):
 def on_dm(prefix, body):
     if prefix == "get_data":
         annotator, key, sensor_id = body.split("\t")
-        data = get_sensor_data(annotator)
+        data = get_sensor_data(annotator, Global)
         val = Global.members["SELF"].annotators.run(annotator, data, key)
         print_and_pub(sensor_id, str(val), Global.publisher, "decide")
     elif prefix == "decide":
@@ -298,6 +337,9 @@ def main(args):
             Global.members["SELF"].annotators.add(
                 annotator, annotator_presets[annotator]
             )
+            sensor = annotator_to_sensor[annotator]
+            if sensor == Sensor.CAM and Global.cam_manager is None:
+                Global.cam_manager = CamManager(annotator_presets[annotator], CAM_DATA_PATH)
         else:
             print(annotator + ": NOT found in annotator preset")
 
