@@ -1,19 +1,6 @@
 from middleware.preset.rules import *
 
 
-class Optimizer:
-    def __init__(self, cost_func=basic_cost_func):
-        self.cost_func = cost_func
-
-    def filter(self, members, pos):
-        # filter 1: not-in-range nodes(sensors)
-        return members
-
-    def find_cost(self, predicates, members, pos):
-        members = self.filter(members, pos)
-        return self.cost_func([predicates, members])
-
-
 def least_cost_annotators(members, annotator_wanted=None):
     # Find least-cost annotator(s) owner
     annotators = {}  # -> [owner, cost]
@@ -48,3 +35,16 @@ def basic_cost_func(args):
                 cost[k] = c
                 plan[k] = [(annotators[a][0], a) for a in combo]
     return cost, plan
+
+
+class Optimizer:
+    def __init__(self, cost_func=basic_cost_func):
+        self.cost_func = cost_func
+
+    def filter(self, members, pos):
+        # filter 1: not-in-range nodes(sensors)
+        return members
+
+    def find_cost(self, predicates, members, pos):
+        members = self.filter(members, pos)
+        return self.cost_func([predicates, members])

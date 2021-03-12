@@ -1,9 +1,8 @@
 import cv2
 import numpy as np
 import time
-from skimage.metrics import structural_similarity
 
-# from middleware.node.utils import async_run_after
+from middleware.node.utils import async_run_after
 
 backSub = cv2.createBackgroundSubtractorMOG2()
 kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2))
@@ -37,9 +36,8 @@ class CamManager:
         self.num_frame = 0
 
         # Preprocessing
-        self.run()
-        # async_run_after(0, self.run)
-        # async_run_after(0, self.clear)
+        async_run_after(0, self.run)
+        async_run_after(0, self.clear)
 
     def run(self):
         while True:
@@ -81,16 +79,16 @@ class CamManager:
                 self.objects[obj_id][1] = cen
                 self.objects[obj_id][4] = (w + self.objects[obj_id][4]) / 2
                 self.objects[obj_id][5] = (h + self.objects[obj_id][5]) / 2
-                cv2.imshow(
-                    "OLD",
-                    subframe,
-                )
-                cv2.waitKey(1000)
+                # cv2.imshow(
+                #     "OLD",
+                #     subframe,
+                # )
+                # cv2.waitKey(1000)
                 return
         self.objects[self.obj_id] = [int(time.time()), cen, x, y, w, h, None]
         self.obj_id += 1
-        cv2.imshow("NEW", subframe)
-        cv2.waitKey(1000)
+        # cv2.imshow("NEW", subframe)
+        # cv2.waitKey(1000)
 
     def clear(self):
         while True:
@@ -100,4 +98,4 @@ class CamManager:
 
 
 if __name__ == "__main__":
-    cam = CamManager(lambda x: {}, "/Users/mike/Desktop/footage.mp4")
+    cam = CamManager(lambda x: {}, "./application/data/footage.mp4")
