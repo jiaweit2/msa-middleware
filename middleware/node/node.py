@@ -49,7 +49,7 @@ class AnnotatorSet:
     def run(self, annotator, data, k):
         # TODO: Offloading here
         annotated = self.get_annotated(annotator, data)
-        return annotated[k] if k in annotated else None
+        return annotated[k] if k in annotated else 0
 
     def add(self, annotator, annotator_meta):
         annotator_meta[1] = int(annotator_meta[1])
@@ -339,7 +339,9 @@ def main(args):
             )
             sensor = annotator_to_sensor[annotator]
             if sensor == Sensor.CAM and Global.cam_manager is None:
-                Global.cam_manager = CamManager(annotator_presets[annotator], CAM_DATA_PATH)
+                Global.cam_manager = CamManager(
+                    annotator_presets[annotator], CAM_DATA_PATH
+                )
         else:
             print(annotator + ": NOT found in annotator preset")
 

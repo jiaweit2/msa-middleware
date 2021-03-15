@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 import time
-
+from threading import RLock, Thread
 from middleware.node.utils import async_run_after
 
 backSub = cv2.createBackgroundSubtractorMOG2()
@@ -26,6 +26,7 @@ class CamManager:
         self.annotate = annotate
         self.objects = {}
         self.obj_id = 0
+        self.lock = RLock()
 
         self.capture = cv2.VideoCapture(self.src)
         if not self.capture.isOpened():
@@ -37,12 +38,12 @@ class CamManager:
 
         # Preprocessing
         async_run_after(0, self.run)
-        async_run_after(0, self.clear)
+        async_run_after(LIVENESS, self.clear)
 
     def run(self):
         while True:
-            print(len(self.objects))
-            frame = self.snapshot()
+            with self.lock:
+                frame = self.snapshot()
             self.background_subtract(frame)
             time.sleep(REFRESH_RATE)
 
@@ -77,25 +78,43 @@ class CamManager:
             ):
                 # Same objects
                 self.objects[obj_id][1] = cen
-                self.objects[obj_id][4] = (w + self.objects[obj_id][4]) / 2
-                self.objects[obj_id][5] = (h + self.objects[obj_id][5]) / 2
+                self.objects[obj_id][4] = int((w + self.objects[obj_id][4]) / 2)
+                self.objects[obj_id][5] = int((h + self.objects[obj_id][5]) / 2)
                 # cv2.imshow(
                 #     "OLD",
                 #     subframe,
                 # )
                 # cv2.waitKey(1000)
                 return
-        self.objects[self.obj_id] = [int(time.time()), cen, x, y, w, h, None]
+        self.objects[self.obj_id] = [
+            int(time.time()),
+            cen,
+            int(x),
+            int(y),
+            int(w),
+            int(h),
+            None,
+        ]
         self.obj_id += 1
         # cv2.imshow("NEW", subframe)
         # cv2.waitKey(1000)
 
     def clear(self):
         while True:
+            print("Clearing up non-informative subframes...")
             curr_time = int(time.time())
-            self.annotate([self.snapshot(), self.objects], True)
+            cnt = len(self.objects)
+            with self.lock:
+                frame = self.snapshot()
+            objects = self.annotate([frame, self.objects], True)
+            with self.lock:
+                self.objects = objects
+            print(
+                "Removed %d subframes, now have %d"
+                % (len(self.objects) - cnt, len(self.objects))
+            )
             time.sleep(LIVENESS)
 
 
 if __name__ == "__main__":
-    cam = CamManager(lambda x: {}, "./application/data/footage.mp4")
+    cam = CamManager(lambda x, y: {}, "./application/data/footage.mp4")

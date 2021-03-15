@@ -16,7 +16,7 @@ def YOLO(data, update=False):
     frame, objects = data
     res = {}
 
-    for id_ in objects:
+    for id_ in list(objects):
         ts, cen, x, y, w, h, annotated = objects[id_]
         if not update and annotated:
             res.update(annotated)
@@ -39,7 +39,7 @@ def YOLO(data, update=False):
                 scores = detect[5:]
                 class_id = np.argmax(scores)
                 conf = scores[class_id]
-                if conf > 0.3:
+                if conf > 0.2:
                     if classes[class_id] in res:
                         res[classes[class_id]] = max(
                             res[classes[class_id]], float(conf)
