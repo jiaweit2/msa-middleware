@@ -2,7 +2,6 @@ import cv2
 import numpy as np
 import time
 from threading import RLock, Thread
-
 from middleware.node.utils import async_run_after
 
 backSub = cv2.createBackgroundSubtractorMOG2()
@@ -31,7 +30,6 @@ class CamManager:
         self.num_frame = 0
 
         # Preprocessing
-        # self.run()
         async_run_after(0, self.run)
         async_run_after(LIVENESS, self.clear)
 
@@ -75,11 +73,11 @@ class CamManager:
                 self.objects[obj_id][1] = cen
                 self.objects[obj_id][4] = int((w + self.objects[obj_id][4]) / 2)
                 self.objects[obj_id][5] = int((h + self.objects[obj_id][5]) / 2)
-                cv2.imshow(
-                    "OLD",
-                    subframe,
-                )
-                cv2.waitKey(1000)
+                # cv2.imshow(
+                #     "OLD",
+                #     subframe,
+                # )
+                # cv2.waitKey(1000)
                 return
         self.objects[self.obj_id] = [
             int(time.time()),
@@ -91,8 +89,8 @@ class CamManager:
             None,
         ]
         self.obj_id += 1
-        cv2.imshow("NEW", subframe)
-        cv2.waitKey(1000)
+        # cv2.imshow("NEW", subframe)
+        # cv2.waitKey(1000)
 
     def clear(self):
         while True:
@@ -112,5 +110,4 @@ class CamManager:
 
 
 if __name__ == "__main__":
-    # cam = CamManager(lambda x, y: {}, "./application/data/footage.mp4")
-    cam = CamManager(lambda x, y: {}, "/Users/mike/Desktop/footage.mp4")
+    cam = CamManager(lambda x, y: {}, "./application/data/footage.mp4")
