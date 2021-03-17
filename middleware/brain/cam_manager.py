@@ -35,18 +35,18 @@ class CamManager:
 
     def run(self):
         while True:
-            with self.lock:
-                frame = self.snapshot()
+            frame = self.snapshot()
             self.background_subtract(frame)
             time.sleep(REFRESH_RATE)
 
     def snapshot(self):
-        self.capture.set(1, self.num_frame)
-        ret, frame = self.capture.read()
-        if not ret:
-            return None
-        self.num_frame += self.fps * REFRESH_RATE
-        return frame
+        with self.lock:
+            self.capture.set(1, self.num_frame)
+            ret, frame = self.capture.read()
+            if not ret:
+                return None
+            self.num_frame += self.fps * REFRESH_RATE
+            return frame
 
     def background_subtract(self, frame):
         mask = backSub.apply(frame)
@@ -97,8 +97,7 @@ class CamManager:
             print("Clearing up non-informative subframes...")
             curr_time = int(time.time())
             cnt = len(self.objects)
-            with self.lock:
-                frame = self.snapshot()
+            frame = self.snapshot()
             objects = self.annotate([frame, self.objects], True)
             with self.lock:
                 self.objects = objects

@@ -67,8 +67,8 @@ def get_sensor_data(annotator, Global):
     # Retrieve latest data from sensor
     sensor = annotator_to_sensor[annotator]
     if sensor == Sensor.CAM:
-        with Global.cam_manager.lock:
-            frame = Global.cam_manager.snapshot()
+        frame = Global.cam_manager.snapshot()
+        print(frame)
         return [frame, Global.cam_manager.objects]
     elif sensor == Sensor.IR:
         return ""
