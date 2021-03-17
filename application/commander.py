@@ -33,7 +33,8 @@ def subscribe():
 if __name__ == "__main__":
     """
     Query format:
-    Lat,Long
+    {position=Lat,Long}
+    {status=running/static}
     /Name = Decision({
         {conditions}
     })
@@ -42,11 +43,13 @@ if __name__ == "__main__":
     with open("application/data/query") as f:
         lines = f.readlines()
         query += (
-            lines[1].split("=")[0].strip()
+            lines[2].split("=")[0].strip()
             + "\t"
-            + "".join(lines[1:])
+            + "".join(lines[2:])
             + "\t"
             + lines[0].strip()
+            + "\t"
+            + lines[1].strip()
         )
     publisher = publisher_init()
     print_and_pub("system", "Preparing to publish...", publisher)
