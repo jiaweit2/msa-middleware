@@ -6,11 +6,9 @@ from mininet.topo import Topo
 from mininet.net import Mininet
 from mininet.util import dumpNodeConnections
 from mininet.log import setLogLevel
-from mininet.node import Node
 from mininet.cli import CLI
 from mininet.link import TCLink
-
-from config import *
+from mininet.node import OVSSwitch, Controller, RemoteController
 
 
 class SingleSwitchTopo(Topo):
@@ -20,7 +18,7 @@ class SingleSwitchTopo(Topo):
         # Python's range(N) generates 0..N-1
         for h in range(n):
             host = self.addHost("h%s" % (h + 1))
-            self.addLink(host, switch, bw=10)
+            self.addLink(host, switch, bw=10, delay="1ms")
 
 
 def run():
@@ -31,29 +29,31 @@ def run():
     print("Simulation Begin")
 
     h1, h2, h3, h4 = net.get("h1", "h2", "h3", "h4")
-    h1.cmd("cd " + AURORA_DIR + "/src/server")
-    h1.cmd("docker-compose up -d")
-    h1.cmd("cd -")
+    h1.cmd("source venv/bin/activate")
+    h2.cmd("source venv/bin/activate")
+    h3.cmd("source venv/bin/activate")
+    h4.cmd("source venv/bin/activate")
 
-    h4.cmd("../middleware/node/run.sh 0004 IR &")
-    h1.cmd("../middleware/node/run.sh 0001 IR &")
-    h3.cmd("../middleware/node/run.sh 0003 YOLO " + DARKNET_YOLO_DIR + "&")
-    h2.cmd("../middleware/node/run.sh 0002 SR &")
+    # Start the server at h1
+    h1.cmd("cd server")
+    h1.cmd("./start.sh")
+    h1.cmd("cd ..")
+    time.sleep(2)
+
+    h4.cmd("python -u middleware/node/node.py --id 0004 --annotators NUL &")
+    h1.cmd("python -u middleware/node/node.py --id 0001 --annotators NUL &")
+    h3.cmd("python -u middleware/node/node.py --id 0003 --annotators YOLO &")
+    h2.cmd("python -u middleware/node/node.py --id 0002 --annotators NUL &")
 
     CLI(net)
     print("Simulation End")
 
     # Cleanup
-    h1.cmd("pkill -f commander")
+    h1.cmd("pkill -f aurora")
     h1.cmd("pkill -f node")
     h2.cmd("pkill -f node")
     h3.cmd("pkill -f node")
     h4.cmd("pkill -f node")
-    time.sleep(2)
-
-    h1.cmd("cd " + AURORA_DIR + "/src/server")
-    h1.cmd("docker-compose down")
-    os.popen("sudo docker stop $(sudo docker ps -aq)")
     net.stop()
 
 

@@ -1,10 +1,15 @@
-PUB_URL = "tcp://localhost:9101"
-SUB_URL = "tcp://localhost:9102"
+from enum import Enum
+
+PUB_URL = "tcp://10.0.0.1:9101"
+SUB_URL = "tcp://10.0.0.1:9102"
 ELECTION_RES_TIMEOUT = 5
 ELECTION_WAIT_TIMEOUT = 12
-CAM_DATA_PATH = "./application/data/sample.jpg"
+CAM_DATA_PATH = "./application/data/footage.mp4"
 
-# darknet constants
-CFG_URL = "./darknet/cfg/yolov3.cfg"
-WEIGHT_URL = "./darknet/yolov3.weights"
-CLASS_URL = "./darknet/data/coco.names"
+PRECESION = 10
+PACKETSIZE = 1000
+PACKETCOUNT = 1000
+
+# Sensor Manager
+Sensor = Enum("Sensor", "CAM IR SR")
+CAM_PREPROC_NAMES = ["sky", "ground", "road"]

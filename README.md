@@ -1,8 +1,6 @@
 # MSA-Middleware
 
 ## Install
-Clone <a href="https://github.com/jiaweit2/aurora-net-iobt-cra-site-server.git">AURORA-NET</a>, follow its instructions to install AURORA-NET.
-
 Clone the middleware, go to the directory:
 ```
 cd path/to/msa-middleware
@@ -18,11 +16,17 @@ pip install -r requirements.txt
 ``` 
 
 ### Environment Variables
-Add some paths in `venv/bin/activate`:
+#### Add some variables in `venv/bin/activate` as follows
+Add mininet path to PYTHONPATH:
 ```
 export PYTHONPATH=$PYTHONPATH:/path/to/mininet
 ```
-Also, config the middleware variables in `msa-middleware/application/config.py` before running.
+Add dependent paths for YOLO(annotator):
+```
+export CFG_URL="path/to/darknet/cfg/yolov3-tiny.cfg"
+export WEIGHT_URL="path/to/darknet/yolov3-tiny.weights"
+export CLASS_URL="path/to/darknet/data/coco.names"
+```
 
 ## Run
 Start Virtualenv
@@ -32,4 +36,10 @@ source venv/bin/activate
 Start the middleware in `msa-middleware/application/`
 ```
 sudo python launch_mininet.py
+```
+
+## Example Application
+Run `commander.py` on any host in mininet:
+```
+h1 python -u application/commander.py
 ```
