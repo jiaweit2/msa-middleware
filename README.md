@@ -33,7 +33,7 @@ source venv/bin/activate
 # Install requirements
 pip install -r requirements.txt 
 
-sudo python launch_mininet.py
+sudo python application/launch_mininet.py
 ```
 
 ## Example Application
