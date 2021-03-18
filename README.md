@@ -12,6 +12,8 @@ python3 -m venv venv
 ```
 Then install the packages:
 ```
+# Start Virtualenv
+source venv/bin/activate
 pip install -r requirements.txt 
 ``` 
 
@@ -29,10 +31,6 @@ export CLASS_URL="path/to/darknet/data/coco.names"
 ```
 
 ## Run
-Start Virtualenv
-```
-source venv/bin/activate
-```
 Start the middleware in `msa-middleware/application/`
 ```
 sudo python launch_mininet.py
