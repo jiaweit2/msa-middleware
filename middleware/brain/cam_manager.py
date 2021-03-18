@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import time
 from threading import RLock, Thread
-from middleware.node.utils import async_run_after
+from middleware.node.utils import async_run_after, print_and_pub
 
 backSub = cv2.createBackgroundSubtractorMOG2()
 kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2))
@@ -14,7 +14,8 @@ LIVENESS = 600
 
 
 class CamManager:
-    def __init__(self, annotate, src):
+    def __init__(self, _id, annotate, src):
+        self.curr_id = _id
         self.src = src
         self.annotate = annotate
         self.objects = {}
@@ -30,8 +31,44 @@ class CamManager:
         self.num_frame = 0
 
         # Preprocessing
-        async_run_after(0, self.run)
-        async_run_after(LIVENESS, self.clear)
+        # async_run_after(0, self.run)
+        # async_run_after(LIVENESS, self.clear)
+
+        self.stream_mode = 0
+        self.stream_metas = None
+
+    def stream_annotated(self, to, topic, publisher):
+        self.stream_metas = [to, topic, publisher]
+        async_run_after(0, self.send_stream_annotated)
+
+    def send_stream_annotated(self):
+        to, topic, publisher = self.stream_metas
+        body = ""
+        while True:
+            frame = self.snapshot()
+            mode = self.stream_mode
+            if mode == 0:
+                body = cv2.imencode(".png", frame)[1].tobytes()
+            elif mode == 1:
+                updated_subframe = self.background_subtract(frame)
+                body = b"delim2".join(updated_subframe)
+
+            time.sleep(REFRESH_RATE)
+
+            if len(body) == 0:
+                continue
+            print_and_pub(
+                topic,
+                body,
+                publisher,
+                str(round(time.time(), 3)) + "\t" + self.curr_id + "\t" + str(mode),
+            )
+
+    def increment(self):
+        self.stream_mode = min(self.stream_mode + 1, 1)
+
+    def decrement(self):
+        self.stream_mode = max(self.stream_mode - 1, 0)
 
     def run(self):
         while True:
@@ -54,12 +91,22 @@ class CamManager:
         num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
             mask, connectivity=4
         )
+        updated_subframe = []
         for i in range(1, num_labels):
             x, y, w, h, size = stats[i]
-            if self.res_w > w and size > MIN_SIZE:
+            if size > MIN_SIZE and self.res_w > w:
                 # Crop parts of images that are larger than MIN_SIZE
                 subframe = frame[y : y + h, x : x + w]
+                print(x, y, w, h)
+                updated_subframe.append(
+                    str(x).encode("utf-8")
+                    + b"delim1"
+                    + str(y).encode("utf-8")
+                    + b"delim1"
+                    + cv2.imencode(".png", subframe)[1].tobytes()
+                )
                 self.cache_obj(centroids[i], x, y, w, h, subframe)
+        return updated_subframe
 
     def cache_obj(self, cen, x, y, w, h, subframe):
         for obj_id in self.objects:
@@ -79,16 +126,17 @@ class CamManager:
                 # )
                 # cv2.waitKey(1000)
                 return
-        self.objects[self.obj_id] = [
-            int(time.time()),
-            cen,
-            int(x),
-            int(y),
-            int(w),
-            int(h),
-            None,
-        ]
-        self.obj_id += 1
+        with self.lock:
+            self.objects[self.obj_id] = [
+                int(time.time()),
+                cen,
+                int(x),
+                int(y),
+                int(w),
+                int(h),
+                None,
+            ]
+            self.obj_id += 1
         # cv2.imshow("NEW", subframe)
         # cv2.waitKey(1000)
 

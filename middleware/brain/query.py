@@ -3,6 +3,17 @@ from middleware.common.parser import AthenaParser
 from middleware.node.utils import *
 
 
+def on_running_query(plan, Global):
+    for predicate in plan:
+        owner, annotator = plan[predicate][0]
+        print_and_pub(
+            owner,
+            annotator + "\t" + Global.curr_id,
+            Global.publisher,
+            "stream_annotated",
+        )
+
+
 def on_query(query, Global):
     name, input_str, position, status = query.split("\t")
     # Parse boolean expression of decision query
@@ -11,11 +22,15 @@ def on_query(query, Global):
     decision_logic, coa_validity, predicates = a.variables[name][1:4]
     post_process_coa(coa_validity)
     cost, plan = Global.optimizer.find_cost(predicates, Global.members, position)
-    print(cost, plan)
-    d = Decision("/query_res", decision_logic, coa_validity, predicates, 60, cost=cost)
-    with Global.lock:
-        Global.buffer = [d, plan, predicates, 0, [], None]
-    schedule(Global)
+    if status == "running":
+        on_running_query(plan, Global)
+    else:
+        d = Decision(
+            "/query_res", decision_logic, coa_validity, predicates, 60, cost=cost
+        )
+        with Global.lock:
+            Global.buffer = [d, plan, predicates, 0, [], None]
+        schedule(Global)
 
 
 def schedule(Global):
@@ -61,4 +76,4 @@ def schedule(Global):
     # a result is obtained
     with Global.lock:
         Global.buffer = None
-    print_and_pub("query_result", d.get_value(), Global.publisher)
+    print_and_pub("result", d.get_value(), Global.publisher)

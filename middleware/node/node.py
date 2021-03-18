@@ -128,7 +128,7 @@ def publisher_init():
 
     # Tell others my annotators
     async_run_after(
-        7,
+        6,
         lambda: print_and_pub(
             "annotator",
             str(Global.members["SELF"].annotators),
@@ -163,7 +163,7 @@ def subscriber_init():
         "query",
         "annotator",
         Global.curr_id,
-        "bw-" + Global.curr_id,
+        # "bw-" + Global.curr_id,
     ]
     for topic in topics:
         if type(topic) is str:
@@ -195,8 +195,8 @@ def message_buffer():
             message = Global.msg_buffer.pop(0)
 
         topic = message[0].decode("utf-8")
-        if topic == "bw-" + Global.curr_id:
-            message = message[:2] + [message[2:-1], message[-1]]
+        # if topic == "bw-" + Global.curr_id:
+        #     message = message[:2] + [message[2:-1], message[-1]]
         prefix = message[1].decode("utf-8")
         body = message[2]
         if isinstance(body, bytes):
@@ -226,7 +226,6 @@ def on_hb_data(id_, timestamp, curr_ts):
         print("Current members: ", list(Global.members.keys()))
         if Global.leader is None or Global.leader is not None and id_ > Global.leader:
             init_election()
-        measure_throughput(Global, id_)
     with Global.lock:
         Global.members[id_].last_updated = curr_ts
 
@@ -269,6 +268,14 @@ def on_dm(prefix, body):
         if Global.buffer and len(Global.buffer) == 6:
             Global.buffer[4].append(val)
             schedule(Global)
+    elif prefix == "stream_annotated":
+        annotator, to = body.split("\t")
+        get_sensor_live_annotated(annotator, Global, to)
+    elif prefix == "cam":
+        if body == "+":
+            Global.cam_manager.increment()
+        else:
+            Global.cam_manager.decrement()
 
 
 def on_bw(arrival_time, prefix, packets):
@@ -340,7 +347,7 @@ def main(args):
             sensor = annotator_to_sensor[annotator]
             if sensor == Sensor.CAM and Global.cam_manager is None:
                 Global.cam_manager = CamManager(
-                    annotator_presets[annotator], CAM_DATA_PATH
+                    Global.curr_id, annotator_presets[annotator], CAM_DATA_PATH
                 )
         else:
             print(annotator + ": NOT found in annotator preset")
