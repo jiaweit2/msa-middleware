@@ -23,9 +23,9 @@ export PYTHONPATH=$PYTHONPATH:/path/to/mininet
 ```
 Add dependent paths for YOLO(annotator):
 ```
-export CFG_URL = "path/to/darknet/cfg/yolov3.cfg"
-export WEIGHT_URL = "path/to/darknet/yolov3-tiny.weights"
-export CLASS_URL = "path/to/darknet/data/coco.names"
+export CFG_URL="path/to/darknet/cfg/yolov3-tiny.cfg"
+export WEIGHT_URL="path/to/darknet/yolov3-tiny.weights"
+export CLASS_URL="path/to/darknet/data/coco.names"
 ```
 
 ## Run
