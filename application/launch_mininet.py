@@ -45,6 +45,11 @@ def run():
     h3.cmd("python -u middleware/node/node.py --id 0003 --annotators YOLO &")
     h2.cmd("python -u middleware/node/node.py --id 0002 --annotators NUL &")
 
+    h1.cmd("deactivate")
+    h2.cmd("deactivate")
+    h3.cmd("deactivate")
+    h4.cmd("deactivate")
+
     CLI(net)
     print("Simulation End")
 
