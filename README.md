@@ -4,11 +4,15 @@
 Clone the middleware, go to the directory:
 ```
 cd path/to/msa-middleware
-```
 
-### Create Virtualenv
-```
+# Create Virtualenv
 python3 -m venv venv
+
+# Start Virtualenv
+source venv/bin/activate
+
+# Install requirements
+pip install -r requirements.txt 
 ```
 
 ### Environment Variables
@@ -27,17 +31,13 @@ export CLASS_URL="path/to/darknet/data/coco.names"
 ## Run
 Start the middleware in `msa-middleware/application/`
 ```
-# Start Virtualenv
-source venv/bin/activate
-
-# Install requirements
-pip install -r requirements.txt 
-
 sudo python application/launch_mininet.py
 ```
 
 ## Example Application
 Run `commander.py` on any host in mininet:
 ```
-h1 python -u application/commander.py
+xterm h1
+source venv/bin/activate
+python -u application/commander.py
 ```
