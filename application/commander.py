@@ -71,7 +71,7 @@ def subscribe(is_running, publisher):
             print("Mbps: ", mbps)
             print("Last Mbps: ", last_mode_mbps)
             if (not mode_adapting) and (
-                (mbps > last_mode_mbps * 0.8 and mode > 0 and latency < REFRESH_RATE)
+                (mbps > last_mode_mbps and mode > 0 and latency < REFRESH_RATE)
                 or (
                     (mbps <= last_mode_mbps or latency > REFRESH_RATE * 1.5)
                     and mode < MODE_HIGHEST

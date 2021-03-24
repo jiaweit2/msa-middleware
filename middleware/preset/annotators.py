@@ -38,7 +38,7 @@ def YOLO(frame, draw_bb=False):
     if draw_bb:
         # No-max suppression
         for x, y, xw, yh, class_id in non_max_suppression_fast(np.array(boxes), 0.3):
-            draw_bounding_box(frame, classes[class_id], x, y, xw, yh)
+            draw_bounding_box(frame, class_id, x, y, xw, yh)
 
     return res
 
@@ -51,8 +51,16 @@ def SR(data):
     return {"person": 0.99}
 
 
-annotator_presets = {"YOLO": [YOLO, 5], "IR": [IR, 2], "SR": [SR, 2]}
-annotator_to_sensor = {"YOLO": Sensor.CAM, "IR": Sensor.IR, "SR": Sensor.SR}
+annotator_presets = {
+    "YOLO": [YOLO, 5],
+    "IR": [IR, 2],
+    "SR": [SR, 2],
+}
+annotator_to_sensor = {
+    "YOLO": Sensor.CAM,
+    "IR": Sensor.IR,
+    "SR": Sensor.SR,
+}
 
 if __name__ == "__main__":
     import cv2
