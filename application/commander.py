@@ -3,9 +3,15 @@ import time
 import cv2
 import numpy as np
 from middleware.node.utils import *
-from middleware.brain.cam_manager import REFRESH_RATE
+from middleware.brain.cam_manager import REFRESH_RATE, MODE_HIGHEST
+from middleware.preset.annotators import YOLO
+from middleware.preset.utils import draw_bounding_box
 
-NETWORK_CHECK_INTERVAL = 5
+bg = None
+curr_mode = 0
+mode_adapting = False
+last_mode_mbps = 0
+objects = {}
 
 
 def publisher_init():
@@ -19,6 +25,8 @@ def publisher_init():
 
 
 def subscribe(is_running, publisher):
+    global bg, curr_mode, mode_adapting, last_mode_mbps
+
     # Create a 0MQ Context
     context = zmq.Context()
     # Create a subscriber socket
@@ -30,37 +38,62 @@ def subscribe(is_running, publisher):
     subscriber.setsockopt(zmq.SUBSCRIBE, b"result")
 
     if is_running:
-        last_check = time.time()
-        bg = None
+        cnt1 = 0
+        cnt0 = 0
+
         while True:
             message = subscriber.recv_multipart()
             curr_ts = time.time()
             ts, sender, mode = message[1].decode("utf-8").split("\t")
             mode = int(mode)
+            if curr_mode != mode:
+                mode_adapting = False
+                curr_mode = mode
             if mode > 0:
                 body = message[2].split(b"delim2")
             else:
                 frame = np.frombuffer(message[2], dtype=np.uint8)
                 frame = cv2.imdecode(frame, flags=1)
+
             # Set a clear background for future subframe update
             if mode == 0 and bg is None:
                 bg = frame.copy()
-            print("Current mode: ", mode)
-            print("Body size: ", len(message[2]))
-            print("Latency: ", curr_ts - float(ts))
+
             # Adapt to network change
-            if (
-                curr_ts - float(ts) > REFRESH_RATE - 0.1
-                and curr_ts - last_check > NETWORK_CHECK_INTERVAL
+            latency = curr_ts - float(ts)
+            size = float(len(message[2])) / 125000
+            mbps = size / latency
+            ideal_mbps = size / REFRESH_RATE
+            print("Current mode: ", mode)
+            print("Body size (mb): ", size)
+            print("Latency: ", latency)
+            print("Ideal Mbps: ", ideal_mbps)
+            print("Mbps: ", mbps)
+            print("Last Mbps: ", last_mode_mbps)
+            if (not mode_adapting) and (
+                (mbps > last_mode_mbps * 0.8 and mode > 0 and latency < REFRESH_RATE)
+                or (
+                    (mbps <= last_mode_mbps or latency > REFRESH_RATE * 1.5)
+                    and mode < MODE_HIGHEST
+                )
             ):
-                print_and_pub(sender, "+", publisher, "cam")
-                last_check = curr_ts
-            if (
-                curr_ts - float(ts) < REFRESH_RATE - 0.5
-                and curr_ts - last_check > NETWORK_CHECK_INTERVAL
-            ):
-                print_and_pub(sender, "-", publisher, "cam")
-                last_check = curr_ts
+                print_and_pub(
+                    sender,
+                    str(mbps - ideal_mbps),
+                    publisher,
+                    "cam",
+                )
+                print("Mode switch request sent!")
+
+                mode_adapting = True
+                last_mode_mbps = ideal_mbps
+
+                if mbps < ideal_mbps:
+                    subscriber.close(linger=0)
+                    context.destroy(linger=0)
+                    print("Network is unstable, reconnect...")
+                    time.sleep(REFRESH_RATE)
+                    return True
 
             # Post processing
             if mode == 1 and bg is not None:
@@ -74,17 +107,30 @@ def subscribe(is_running, publisher):
                     h, w, _ = subframe.shape
                     frame[y : y + h, x : x + w] = subframe
 
+            # Annotation
+            print(YOLO(frame, True))
+
             # Show
             cv2.imshow("Live Stream", frame)
             cv2.waitKey(30)
 
-            time.sleep(REFRESH_RATE)
+            if mode == 0:
+                cnt0 += 1
+            else:
+                cnt1 += 1
+            print(cnt0, cnt1)
+
+            time.sleep(
+                REFRESH_RATE - max(0, time.time() - curr_ts)
+            )  # offset processing time
 
     else:
         message = subscriber.recv_multipart()
         body = message[2].decode("utf-8")
         print("Query result: ")
         print(body)
+
+    return False
 
 
 if __name__ == "__main__":
@@ -112,4 +158,7 @@ if __name__ == "__main__":
     print_and_pub("system", "Preparing to publish...", publisher)
     time.sleep(3)
     print_and_pub("query", query, publisher, "0001")
-    subscribe(lines[1].strip() == "running", publisher)
+
+    restart = True
+    while restart:
+        restart = subscribe(lines[1].strip() == "running", publisher)

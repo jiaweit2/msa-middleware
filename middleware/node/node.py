@@ -11,6 +11,8 @@ from middleware.preset.annotators import *
 
 class Global:
     publisher = None
+    publisher_thread = None
+    publisher_context = None
     curr_id = None
     members = {}
     # If no custom function, use default optimizer
@@ -117,9 +119,11 @@ def init_election():
 
 def publisher_init():
     # Create a 0MQ Context
-    context = zmq.Context()
+    Global.publisher_context = zmq.Context()
     # Create a publisher socket
-    Global.publisher = context.socket(zmq.PUB)
+    Global.publisher = Global.publisher_context.socket(zmq.PUB)
+    # Global.publisher.setsockopt(zmq.SNDHWM, 1000)
+    # Global.publisher.setsockopt(zmq.LINGER, 0)
     print("Connecting to: %s" % PUB_URL)
 
     Global.publisher.connect(PUB_URL)
@@ -128,7 +132,7 @@ def publisher_init():
 
     # Tell others my annotators
     async_run_after(
-        6,
+        2,
         lambda: print_and_pub(
             "annotator",
             str(Global.members["SELF"].annotators),
@@ -137,8 +141,14 @@ def publisher_init():
         ),
     )
 
+    if Global.cam_manager is not None and Global.cam_manager.stream_metas is not None:
+        Global.cam_manager.stream_metas[-1] = Global.publisher
+        Global.cam_manager.stream(Global.cam_manager.stream_metas, t=1)
+
     # Start heartbeat
     while True:
+        if Global.publisher == None:
+            return
         print_and_pub(
             "heartbeat",
             str(round(time.time(), PRECESION)),
@@ -212,20 +222,20 @@ def message_buffer():
                 on_annotator(prefix, body)
             elif topic == Global.curr_id:
                 on_dm(prefix, body)
-            elif topic[:2] == "bw":
-                on_bw(curr_ts, prefix, body)
+            # elif topic[:2] == "bw":
+            #     on_bw(curr_ts, prefix, body)
         elif topic == "query":
             # Current node is assigned to process a query
             on_query(body, Global)
 
 
 def on_hb_data(id_, timestamp, curr_ts):
-    # print("Get Msg from " + id_)
     if id_ not in Global.members:
         Global.members[id_] = Member(id_)
         print("Current members: ", list(Global.members.keys()))
         if Global.leader is None or Global.leader is not None and id_ > Global.leader:
             init_election()
+
     with Global.lock:
         Global.members[id_].last_updated = curr_ts
 
@@ -268,43 +278,40 @@ def on_dm(prefix, body):
         if Global.buffer and len(Global.buffer) == 6:
             Global.buffer[4].append(val)
             schedule(Global)
-    elif prefix == "stream_annotated":
+    elif prefix == "stream":
         annotator, to = body.split("\t")
-        get_sensor_live_annotated(annotator, Global, to)
+        get_sensor_live(annotator, Global, to)
     elif prefix == "cam":
-        if body == "+":
-            Global.cam_manager.increment()
-        else:
-            Global.cam_manager.decrement()
+        Global.cam_manager.adapt(float(body), reset_publisher)
 
 
-def on_bw(arrival_time, prefix, packets):
-    to, is_first_trip, rtt, start_ts, packets_size = prefix.split("\t")
-    if is_first_trip == "false":  # throughput test finish
-        packets_size = float(packets_size)
-        with Global.lock:
-            Global.members[to].throughput = round(packets_size / float(rtt), PRECESION)
-        print(
-            Global.curr_id + "-" + to + ": Throughput (Mb/s)",
-            Global.members[to].throughput,
-        )
-    else:
-        rtt = arrival_time - float(start_ts)
-        packets_size = sum(map(len, packets)) / 125000.0
-        print_and_pub(
-            "bw-" + to,
-            "",
-            Global.publisher,
-            Global.curr_id
-            + "\t"
-            + "false"
-            + "\t"
-            + str(rtt)
-            + "\t"
-            + str(round(time.time(), PRECESION))
-            + "\t"
-            + str(packets_size),
-        )
+# def on_bw(arrival_time, prefix, packets):
+#     to, is_first_trip, rtt, start_ts, packets_size = prefix.split("\t")
+#     if is_first_trip == "false":  # throughput test finish
+#         packets_size = float(packets_size)
+#         with Global.lock:
+#             Global.members[to].throughput = round(packets_size / float(rtt), PRECESION)
+#         print(
+#             Global.curr_id + "-" + to + ": Throughput (Mb/s)",
+#             Global.members[to].throughput,
+#         )
+#     else:
+#         rtt = arrival_time - float(start_ts)
+#         packets_size = sum(map(len, packets)) / 125000.0
+#         print_and_pub(
+#             "bw-" + to,
+#             "",
+#             Global.publisher,
+#             Global.curr_id
+#             + "\t"
+#             + "false"
+#             + "\t"
+#             + str(rtt)
+#             + "\t"
+#             + str(round(time.time(), PRECESION))
+#             + "\t"
+#             + str(packets_size),
+#         )
 
 
 def detect_failure():
@@ -333,6 +340,22 @@ def detect_failure():
         time.sleep(20)
 
 
+def reset_publisher():
+    print("Reset Publisher...")
+    Global.publisher.close(linger=0)
+    Global.publisher_context.destroy(linger=0)
+    with Global.lock:
+        Global.publisher = None
+        Global.publisher_context = None
+    Global.publisher_thread.join()
+    if Global.cam_manager is not None and Global.cam_manager.stream_thread is not None:
+        Global.cam_manager.stream_thread.join()
+        Global.cam_manager.stream_thread = None
+    Global.publisher_thread = None
+    Global.publisher_thread = async_run_after(0, publisher_init)
+    print("Reset success")
+
+
 def main(args):
     # Assign values to Global
     Global.curr_id = args.id
@@ -346,13 +369,11 @@ def main(args):
             )
             sensor = annotator_to_sensor[annotator]
             if sensor == Sensor.CAM and Global.cam_manager is None:
-                Global.cam_manager = CamManager(
-                    Global.curr_id, annotator_presets[annotator], CAM_DATA_PATH
-                )
+                Global.cam_manager = CamManager(Global.curr_id, CAM_DATA_PATH)
         else:
             print(annotator + ": NOT found in annotator preset")
 
-    async_run_after(0, publisher_init)
+    Global.publisher_thread = async_run_after(0, publisher_init)
     async_run_after(0, subscriber_init)
     async_run_after(0, detect_failure)
 

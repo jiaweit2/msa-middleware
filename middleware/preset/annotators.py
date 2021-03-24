@@ -1,57 +1,45 @@
-import os
-from middleware.node.const import *
-
 import cv2
 import numpy as np
+from middleware.node.const import *
+from middleware.preset.utils import *
 
-net = cv2.dnn.readNetFromDarknet(os.environ["CFG_URL"], os.environ["WEIGHT_URL"])
-layers_names = net.getLayerNames()
-output_layers = [layers_names[i[0] - 1] for i in net.getUnconnectedOutLayers()]
-classes = []
-with open(os.environ["CLASS_URL"], "r") as f:
-    classes = [line.strip() for line in f.readlines()]
 
 # Preset Annotators
-def YOLO(data, update=False):
-    frame, objects = data
+def YOLO(frame, draw_bb=False):
     res = {}
+    blob = cv2.dnn.blobFromImage(
+        frame,
+        scalefactor=1 / 255,
+        size=(416, 416),
+        mean=(0, 0, 0),
+        swapRB=True,
+        crop=False,
+    )
+    net.setInput(blob)
+    outputs = net.forward(output_layers)
+    boxes = []
+    for output in outputs:
+        for detect in output:
+            scores = detect[5:]
+            class_id = np.argmax(scores)
+            conf = scores[class_id]
+            if conf > 0.4 and (
+                classes[class_id] in res
+                and conf > res[classes[class_id]]
+                or classes[class_id] not in res
+            ):
+                res[class_id] = conf
+                if draw_bb:
+                    w = int(detect[2] * frame.shape[1])
+                    h = int(detect[3] * frame.shape[0])
+                    x = int(detect[0] * frame.shape[1] - w / 2)
+                    y = int(detect[1] * frame.shape[0] - h / 2)
+                    boxes.append([x, y, x + w, y + h, class_id])
+    if draw_bb:
+        # No-max suppression
+        for x, y, xw, yh, class_id in non_max_suppression_fast(np.array(boxes), 0.3):
+            draw_bounding_box(frame, classes[class_id], x, y, xw, yh)
 
-    for id_ in list(objects):
-        ts, cen, x, y, w, h, annotated = objects[id_]
-        if not update and annotated:
-            res.update(annotated)
-            continue
-
-        subframe = frame[y : y + h, x : x + w]
-        blob = cv2.dnn.blobFromImage(
-            subframe,
-            scalefactor=0.00392,
-            size=(320, 320),
-            mean=(0, 0, 0),
-            swapRB=True,
-            crop=False,
-        )
-        net.setInput(blob)
-        outputs = net.forward(output_layers)
-        empty_subframe = True
-        for output in outputs:
-            for detect in output:
-                scores = detect[5:]
-                class_id = np.argmax(scores)
-                conf = scores[class_id]
-                if conf > 0.2:
-                    if classes[class_id] in res:
-                        res[classes[class_id]] = max(
-                            res[classes[class_id]], float(conf)
-                        )
-                    else:
-                        res[classes[class_id]] = float(conf)
-                    empty_subframe = False
-        if empty_subframe and update:
-            del objects[id_]
-    print(res)
-    if update:
-        return objects
     return res
 
 
@@ -69,8 +57,9 @@ annotator_to_sensor = {"YOLO": Sensor.CAM, "IR": Sensor.IR, "SR": Sensor.SR}
 if __name__ == "__main__":
     import cv2
 
-    img = cv2.imread(CAM_DATA_PATH)
-    img = cv2.resize(img, None, fx=0.4, fy=0.4)
-    # height, width, channels = img.shape
-    data = cv2.imencode(".jpg", img)[1].tobytes()
-    print(YOLO(data))
+    cap = cv2.VideoCapture(CAM_DATA_PATH)
+    while True:
+        ret, frame = cap.read()
+        print(YOLO(frame, True))
+        cv2.imshow("frame", frame)
+        cv2.waitKey(30)

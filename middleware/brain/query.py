@@ -10,7 +10,7 @@ def on_running_query(plan, Global):
             owner,
             annotator + "\t" + Global.curr_id,
             Global.publisher,
-            "stream_annotated",
+            "stream",
         )
 
 

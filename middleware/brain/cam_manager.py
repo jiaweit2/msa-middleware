@@ -10,16 +10,13 @@ MIN_SIZE = 25 * 25  # px^2
 W_THRESHOLD = 0.8
 DIST_THRESHOLD = 100
 REFRESH_RATE = 1  # Snapshot every X seconds
-LIVENESS = 600
+MODE_HIGHEST = 1
 
 
 class CamManager:
-    def __init__(self, _id, annotate, src):
+    def __init__(self, _id, src):
         self.curr_id = _id
         self.src = src
-        self.annotate = annotate
-        self.objects = {}
-        self.obj_id = 0
         self.lock = RLock()
 
         self.capture = cv2.VideoCapture(self.src)
@@ -28,24 +25,34 @@ class CamManager:
             exit()
         self.fps = int(self.capture.get(cv2.CAP_PROP_FPS))
         self.res_w = int(self.capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        self.num_frame = 0
+
+        self.num_frame = 1
 
         # Preprocessing
+        # self.run()
         # async_run_after(0, self.run)
-        # async_run_after(LIVENESS, self.clear)
 
+        # Current modes:
+        #       0: Send entire frame
+        #       1: Only send updated subframe when necessary
         self.stream_mode = 0
         self.stream_metas = None
+        self.stream_thread = None
 
-    def stream_annotated(self, to, topic, publisher):
-        self.stream_metas = [to, topic, publisher]
-        async_run_after(0, self.send_stream_annotated)
+    def stream(self, metas, t=0):
+        self.stream_metas = metas
+        self.stream_thread = async_run_after(t, self.send_stream)
 
-    def send_stream_annotated(self):
+    def send_stream(self):
         to, topic, publisher = self.stream_metas
         body = ""
+        cnt0 = 0
+        cnt1 = 0
+        print("Cam Stream starts...")
         while True:
             frame = self.snapshot()
+            if frame is None:
+                return
             mode = self.stream_mode
             if mode == 0:
                 body = cv2.imencode(".png", frame)[1].tobytes()
@@ -57,18 +64,31 @@ class CamManager:
 
             if len(body) == 0:
                 continue
-            print_and_pub(
+            err = print_and_pub(
                 topic,
                 body,
                 publisher,
                 str(round(time.time(), 3)) + "\t" + self.curr_id + "\t" + str(mode),
             )
 
-    def increment(self):
-        self.stream_mode = min(self.stream_mode + 1, 1)
+            if err is not None:
+                # Change in network, abort
+                print("Cam Stream Aborts")
+                return
 
-    def decrement(self):
-        self.stream_mode = max(self.stream_mode - 1, 0)
+            if mode == 0:
+                cnt0 += 1
+            else:
+                cnt1 += 1
+            print(cnt0, cnt1)
+
+    def adapt(self, diff, reset_publisher):
+        print("Adapt to network")
+        if diff < 0 and self.stream_mode < MODE_HIGHEST:
+            self.stream_mode = min(self.stream_mode + 1, MODE_HIGHEST)
+            async_run_after(0, reset_publisher)
+        elif diff > 0:
+            self.stream_mode = max(self.stream_mode - 1, 0)
 
     def run(self):
         while True:
@@ -91,13 +111,14 @@ class CamManager:
         num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
             mask, connectivity=4
         )
+        # cv2.imshow("f", mask)
+        # cv2.waitKey(30)
         updated_subframe = []
         for i in range(1, num_labels):
             x, y, w, h, size = stats[i]
             if size > MIN_SIZE and self.res_w > w:
                 # Crop parts of images that are larger than MIN_SIZE
                 subframe = frame[y : y + h, x : x + w]
-                print(x, y, w, h)
                 updated_subframe.append(
                     str(x).encode("utf-8")
                     + b"delim1"
@@ -105,56 +126,8 @@ class CamManager:
                     + b"delim1"
                     + cv2.imencode(".png", subframe)[1].tobytes()
                 )
-                self.cache_obj(centroids[i], x, y, w, h, subframe)
         return updated_subframe
-
-    def cache_obj(self, cen, x, y, w, h, subframe):
-        for obj_id in self.objects:
-            cen_ = self.objects[obj_id][1]
-            w_, h_ = self.objects[obj_id][4:6]
-            if (
-                abs(w_ - w) < (w_ * W_THRESHOLD)
-                and np.linalg.norm(cen - cen_) < DIST_THRESHOLD
-            ):
-                # Same objects
-                self.objects[obj_id][1] = cen
-                self.objects[obj_id][4] = int((w + self.objects[obj_id][4]) / 2)
-                self.objects[obj_id][5] = int((h + self.objects[obj_id][5]) / 2)
-                # cv2.imshow(
-                #     "OLD",
-                #     subframe,
-                # )
-                # cv2.waitKey(1000)
-                return
-        with self.lock:
-            self.objects[self.obj_id] = [
-                int(time.time()),
-                cen,
-                int(x),
-                int(y),
-                int(w),
-                int(h),
-                None,
-            ]
-            self.obj_id += 1
-        # cv2.imshow("NEW", subframe)
-        # cv2.waitKey(1000)
-
-    def clear(self):
-        while True:
-            print("Clearing up non-informative subframes...")
-            curr_time = int(time.time())
-            cnt = len(self.objects)
-            frame = self.snapshot()
-            objects = self.annotate([frame, self.objects], True)
-            with self.lock:
-                self.objects = objects
-            print(
-                "Removed %d subframes, now have %d"
-                % (len(self.objects) - cnt, len(self.objects))
-            )
-            time.sleep(LIVENESS)
 
 
 if __name__ == "__main__":
-    cam = CamManager(lambda x, y: {}, "./application/data/footage.mp4")
+    cam = CamManager("0001", "./application/data/footage-480p.mp4")

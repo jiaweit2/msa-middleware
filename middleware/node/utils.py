@@ -15,6 +15,7 @@ def post_process_coa(coas):
 def async_run_after(t, func):
     t = Thread(target=run_after, args=(t, func))
     t.start()
+    return t
 
 
 def run_after(t, func):
@@ -38,6 +39,8 @@ def print_and_pub(topic, body, publisher, prefix=""):
     else:
         bbody = body
 
+    if publisher.closed:
+        return "Closed"
     publisher.send_multipart([btopic, bprefix, bbody])
 
 
@@ -62,16 +65,15 @@ def get_sensor_data(annotator, Global):
     # Retrieve latest data from sensor
     sensor = annotator_to_sensor[annotator]
     if sensor == Sensor.CAM:
-        frame = Global.cam_manager.snapshot()
-        return [frame, Global.cam_manager.objects]
+        return Global.cam_manager.snapshot()
     elif sensor == Sensor.IR:
         return ""
     elif sensor == Sensor.SR:
         return ""
 
 
-def get_sensor_live_annotated(annotator, Global, to):
+def get_sensor_live(annotator, Global, to):
     sensor = annotator_to_sensor[annotator]
     # Should be all async functions
     if sensor == Sensor.CAM:
-        Global.cam_manager.stream_annotated(to, "result", Global.publisher)
+        Global.cam_manager.stream([to, "result", Global.publisher])
