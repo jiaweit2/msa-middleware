@@ -52,12 +52,12 @@ def subscribe(is_running, publisher):
             if mode > 0:
                 body = message[2].split(b"delim2")
             else:
-                frame = np.frombuffer(message[2], dtype=np.uint8)
-                frame = cv2.imdecode(frame, flags=1)
+                body = np.frombuffer(message[2], dtype=np.uint8)
+                body = cv2.imdecode(body, flags=1)
 
             # Set a clear background for future subframe update
             if mode == 0 and bg is None:
-                bg = frame.copy()
+                bg = body.copy()
 
             # Adapt to network change
             latency = curr_ts - float(ts)
@@ -106,9 +106,15 @@ def subscribe(is_running, publisher):
                     subframe = cv2.imdecode(subframe, flags=1)
                     h, w, _ = subframe.shape
                     frame[y : y + h, x : x + w] = subframe
+            elif mode == 1:
+                subframe = np.frombuffer(body[0], dtype=np.uint8)
+                frame = bg = cv2.imdecode(subframe, flags=1)
+                last_mode_mbps = ideal_mbps
+            elif mode == 0:
+                frame = body
 
             # Annotation
-            print(YOLO(frame, True))
+            # print(YOLO(frame, True))
 
             # Show
             cv2.imshow("Live Stream", frame)
@@ -121,7 +127,7 @@ def subscribe(is_running, publisher):
             print(cnt0, cnt1)
 
             time.sleep(
-                REFRESH_RATE - max(0, time.time() - curr_ts)
+                max(0, REFRESH_RATE - max(0, time.time() - curr_ts))
             )  # offset processing time
 
     else:

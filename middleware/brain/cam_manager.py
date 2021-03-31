@@ -5,7 +5,7 @@ from threading import RLock, Thread
 from middleware.node.utils import async_run_after, print_and_pub
 
 backSub = cv2.createBackgroundSubtractorMOG2()
-kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2))
+kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (1, 1))
 MIN_SIZE = 25 * 25  # px^2
 W_THRESHOLD = 0.8
 DIST_THRESHOLD = 100
@@ -58,6 +58,8 @@ class CamManager:
                 body = cv2.imencode(".png", frame)[1].tobytes()
             elif mode == 1:
                 updated_subframe = self.background_subtract(frame)
+                if len(updated_subframe) == 0 and  self.num_frame == 1+self.fps * REFRESH_RATE:
+                    updated_subframe = [cv2.imencode(".png", frame)[1].tobytes()]
                 body = b"delim2".join(updated_subframe)
 
             time.sleep(REFRESH_RATE)
@@ -112,7 +114,7 @@ class CamManager:
             mask, connectivity=4
         )
         # cv2.imshow("f", mask)
-        # cv2.waitKey(30)
+        # cv2.waitKey(1000)
         updated_subframe = []
         for i in range(1, num_labels):
             x, y, w, h, size = stats[i]

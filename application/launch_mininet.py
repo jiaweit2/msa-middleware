@@ -58,7 +58,7 @@ def run():
     links1 = h1.connectionsTo(s1)
     links2 = h3.connectionsTo(s1)
 
-    terms = makeTerms([h1, h3], "Term")
+    terms = makeTerms([h1], "Term")
 
     while True:
         try:
