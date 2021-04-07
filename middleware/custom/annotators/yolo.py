@@ -1,6 +1,8 @@
-import numpy as np
 import os
+import sys
+
 import cv2
+import numpy as np
 
 
 net = cv2.dnn.readNetFromDarknet(os.environ["CFG_URL"], os.environ["WEIGHT_URL"])
@@ -66,3 +68,43 @@ def non_max_suppression_fast(boxes, overlap_threshold):
     # return only the bounding boxes that were picked using the
     # integer data type
     return boxes[pick].astype("int")
+
+
+# Preset Annotators
+def main(frame, draw_bb=False):
+    res = {}
+    blob = cv2.dnn.blobFromImage(
+        frame,
+        scalefactor=1 / 255,
+        size=(416, 416),
+        mean=(0, 0, 0),
+        swapRB=True,
+        crop=False,
+    )
+    net.setInput(blob)
+    outputs = net.forward(output_layers)
+    boxes = []
+    for output in outputs:
+        for detect in output:
+            scores = detect[5:]
+            class_id = np.argmax(scores)
+            conf = scores[class_id]
+            if conf > 0.4 and (
+                classes[class_id] in res
+                and conf > res[classes[class_id]]
+                or classes[class_id] not in res
+            ):
+                res[class_id] = conf
+                if draw_bb:
+                    w = int(detect[2] * frame.shape[1])
+                    h = int(detect[3] * frame.shape[0])
+                    x = int(detect[0] * frame.shape[1] - w / 2)
+                    y = int(detect[1] * frame.shape[0] - h / 2)
+                    boxes.append([x, y, x + w, y + h, class_id])
+    if draw_bb:
+        # No-max suppression
+        for x, y, xw, yh, class_id in non_max_suppression_fast(np.array(boxes), 0.3):
+            draw_bounding_box(frame, class_id, x, y, xw, yh)
+        return frame
+
+    return res

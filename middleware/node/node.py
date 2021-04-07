@@ -1,23 +1,25 @@
 import argparse
-from threading import RLock, Condition
+from threading import Condition, RLock
 
 import zmq
 from middleware.brain.optimizer import Optimizer
 from middleware.brain.query import *
-from middleware.brain.cam_manager import CamManager
+from middleware.custom.initialize import preload, PUB_URL, SUB_URL
 from middleware.node.utils import *
-from middleware.preset.annotators import *
+
+annotator_presets = {}
+sensor_presets = {}
+rules = {}
 
 
 class Global:
     publisher = None
     publisher_thread = None
     publisher_context = None
+    publisher_connected = False
     curr_id = None
     members = {}
-    # If no custom function, use default optimizer
-    optimizer = Optimizer()
-    cam_manager = None
+    optimizer = None
 
     leader = None
     election_status = "NOLEADER"
@@ -36,9 +38,8 @@ class Member:
         self.id = id_
         self.failed = False
         self.last_updated = 0
-        if id_ != "SELF":
-            self.last_updated = int(time.time())
         self.annotators = AnnotatorSet()
+        self.sensors = SensorSet()
 
         # Approximate throughput
         self.throughput = 100
@@ -46,33 +47,36 @@ class Member:
 
 class AnnotatorSet:
     def __init__(self):
-        self.map = {}  # -> [func, cost] (func=None if remote)
+        # annotator_name -> [func, cost, sensor] (func=None if remote)
+        self.map = {}
 
-    def run(self, annotator, data, k):
+    def run(self, annotator_name, data, k):
         # TODO: Offloading here
-        annotated = self.get_annotated(annotator, data)
+        annotated = self.get_annotated(annotator_name, data)
         return annotated[k] if k in annotated else 0
 
-    def add(self, annotator, annotator_meta):
-        annotator_meta[1] = int(annotator_meta[1])
-        self.map[annotator] = annotator_meta
+    def add(self, annotator_name, func, cost, sensor):
+        self.map[annotator_name] = [func, cost, sensor]
 
-    def remove(self, annotator):
-        del self.map[annotator]
+    def remove(self, k):
+        del self.map[k]
+
+    def get(self, k):
+        return self.map[k]
 
     # s: string output from __repr__()
     def update(self, s):
         if s:
             for item in s.split(";"):
-                k, cost = item.split(",")
+                k, cost, sensor_name = item.split(",")
                 if k not in self.map:
-                    self.map[k] = [None, int(cost)]
+                    self.map[k] = [None, int(cost), sensor_name]
                 elif cost < self.map[k][1]:
                     self.map[k][1] = int(cost)
 
-    def get_annotated(self, annotator, data):
-        if annotator in self.map:
-            return self.map[annotator][0](data)
+    def get_annotated(self, annotator_name, data):
+        if annotator_name in self.map:
+            return self.map[annotator_name][0](data)
         return {}
 
     def __repr__(self):
@@ -80,8 +84,42 @@ class AnnotatorSet:
         for k in self.map:
             if s:
                 s += ";"
-            s += k + "," + str(self.map[k][1])
+            s += k + "," + str(self.map[k][1]) + "," + self.map[k][2]
         return s
+
+
+class SensorSet:
+    def __init__(self):
+        # sensor_name -> sensor_manager
+        self.map = {}
+
+    def add(self, sensor_name, sensor_manager):
+        self.map[sensor_name] = sensor_manager
+
+    def remove(self, k):
+        del self.map[k]
+
+    def get(self, k):
+        return self.map[k]
+
+    def get_data(self, sensor_name):
+        return self.map[sensor_name].get_data()
+
+    def stream(self, sensor_name, Global, print_and_pub, topic="result"):
+        self.map[sensor_name].stream([topic, Global, print_and_pub])
+
+    def adapt(self, bw_diff, reset_publisher):
+        for sensor_name in self.map:
+            if self.map[sensor_name].is_streaming:
+                self.map[sensor_name].adapt(bw_diff, reset_publisher)
+
+    def update(self, s):
+        if s:
+            for item in s.split(","):
+                self.map[item] = None
+
+    def __repr__(self):
+        return ",".join(self.map.keys())
 
 
 def call_election(cand=None):
@@ -129,25 +167,11 @@ def publisher_init():
     Global.publisher.connect(PUB_URL)
     print_and_pub("system", "Preparing to publish...", Global.publisher)
     time.sleep(3)
-
-    # Tell others my annotators
-    async_run_after(
-        2,
-        lambda: print_and_pub(
-            "annotator",
-            str(Global.members["SELF"].annotators),
-            Global.publisher,
-            Global.curr_id,
-        ),
-    )
-
-    if Global.cam_manager is not None and Global.cam_manager.stream_metas is not None:
-        Global.cam_manager.stream_metas[-1] = Global.publisher
-        Global.cam_manager.stream(Global.cam_manager.stream_metas, t=1)
+    Global.publisher_connected = True
 
     # Start heartbeat
     while True:
-        if Global.publisher == None:
+        if not Global.publisher_connected:
             return
         print_and_pub(
             "heartbeat",
@@ -171,7 +195,6 @@ def subscriber_init():
         "heartbeat",
         "election",
         "query",
-        "annotator",
         Global.curr_id,
         # "bw-" + Global.curr_id,
     ]
@@ -218,8 +241,6 @@ def message_buffer():
                 on_hb_data(prefix, body, curr_ts)
             elif topic == "election":
                 on_election_data(prefix, body)
-            elif topic == "annotator":
-                on_annotator(prefix, body)
             elif topic == Global.curr_id:
                 on_dm(prefix, body)
             # elif topic[:2] == "bw":
@@ -232,12 +253,28 @@ def message_buffer():
 def on_hb_data(id_, timestamp, curr_ts):
     if id_ not in Global.members:
         Global.members[id_] = Member(id_)
+    if Global.members[id_].last_updated == 0:
         print("Current members: ", list(Global.members.keys()))
         if Global.leader is None or Global.leader is not None and id_ > Global.leader:
             init_election()
 
+        # Respond annotators
+        print_and_pub(
+            id_,
+            Global.curr_id + "\t" + str(Global.members["SELF"].annotators),
+            Global.publisher,
+            "annotator",
+        )
+        # Respond sensors
+        print_and_pub(
+            id_,
+            Global.curr_id + "\t" + str(Global.members["SELF"].sensors),
+            Global.publisher,
+            "sensor",
+        )
     with Global.lock:
         Global.members[id_].last_updated = curr_ts
+        Global.members[id_].failed = False
 
 
 def on_election_data(prefix, cand_id):
@@ -262,27 +299,38 @@ def on_election_data(prefix, cand_id):
             print("Leader is set: ", Global.leader)
 
 
-def on_annotator(id_, annotator_set_string):
-    Global.members[id_].annotators.update(annotator_set_string)
-    print("Received annotators set from " + id_)
-
-
 def on_dm(prefix, body):
     if prefix == "get_data":
-        annotator, key, sensor_id = body.split("\t")
-        data = get_sensor_data(annotator, Global)
-        val = Global.members["SELF"].annotators.run(annotator, data, key)
-        print_and_pub(sensor_id, str(val), Global.publisher, "decide")
+        annotator_name, key, id_ = body.split("\t")
+        sensor_name = Global.members["SELF"].annotators.get(annotator_name)[2]
+        data = Global.members["SELF"].sensors.get_data(sensor_name)
+        val = Global.members["SELF"].annotators.run(annotator_name, data, key)
+        print_and_pub(id_, str(val), Global.publisher, "decide")
     elif prefix == "decide":
         val = eval(body)
         if Global.buffer and len(Global.buffer) == 6:
             Global.buffer[4].append(val)
             schedule(Global)
     elif prefix == "stream":
-        annotator, to = body.split("\t")
-        get_sensor_live(annotator, Global, to)
-    elif prefix == "cam":
-        Global.cam_manager.adapt(float(body), reset_publisher)
+        annotator_name, to = body.split("\t")
+        sensor_name = Global.members["SELF"].annotators.get(annotator_name)[2]
+        # topic can be set to "to" if the stream wants to be sent to the requester,
+        # otherwise, in default, the stream will be sent to "result"
+        Global.members["SELF"].sensors.stream(sensor_name, Global, print_and_pub)
+    elif prefix == "bw":
+        Global.members["SELF"].sensors.adapt(float(body), reset_publisher)
+    elif prefix == "annotator":
+        id_, annotator_set_string = body.split("\t")
+        if id_ not in Global.members:
+            Global.members[id_] = Member(id_)
+        Global.members[id_].annotators.update(annotator_set_string)
+        print("Received annotators set from " + id_)
+    elif prefix == "sensor":
+        id_, sensor_set_string = body.split("\t")
+        if id_ not in Global.members:
+            Global.members[id_] = Member(id_)
+        Global.members[id_].sensors.update(sensor_set_string)
+        print("Received sensors set from " + id_)
 
 
 # def on_bw(arrival_time, prefix, packets):
@@ -320,11 +368,11 @@ def detect_failure():
         curr_time = int(time.time())
         reelect = False
         for id_, member in Global.members.items():
-            if id_ == "SELF":
+            if id_ == "SELF" or member.last_updated == 0:
                 continue
-            if curr_time - member.last_updated > 20:
+            if curr_time - member.last_updated > 10:
                 Global.members[id_].failed = True
-            if curr_time - member.last_updated > 40 and member.failed:
+            if curr_time - member.last_updated > 15 and member.failed:
                 to_remove_keys.append(id_)
         for key in to_remove_keys:
             if key == Global.leader:
@@ -337,55 +385,58 @@ def detect_failure():
                 Global.election_status = "NOLEADER"
                 Global.leader = None
             init_election()
-        time.sleep(20)
+        time.sleep(10)
 
 
 def reset_publisher():
     print("Reset Publisher...")
+    with Global.lock:
+        Global.publisher_connected = False
     Global.publisher.close(linger=0)
     Global.publisher_context.destroy(linger=0)
     with Global.lock:
         Global.publisher = None
         Global.publisher_context = None
     Global.publisher_thread.join()
-    if Global.cam_manager is not None and Global.cam_manager.stream_thread is not None:
-        Global.cam_manager.stream_thread.join()
-        Global.cam_manager.stream_thread = None
     Global.publisher_thread = None
     Global.publisher_thread = async_run_after(0, publisher_init)
-    print("Reset success")
 
 
 def main(args):
+    global annotator_presets, sensor_presets, rules
     # Assign values to Global
     Global.curr_id = args.id
     Global.members["SELF"] = Member("SELF")
-    # Retrieve preset annotating functions
-    annotators = args.annotators.split(",")
-    for annotator in annotators:
-        if annotator in annotator_presets:
-            Global.members["SELF"].annotators.add(
-                annotator, annotator_presets[annotator]
-            )
-            sensor = annotator_to_sensor[annotator]
-            if sensor == Sensor.CAM and Global.cam_manager is None:
-                Global.cam_manager = CamManager(Global.curr_id, CAM_DATA_PATH)
-        else:
-            print(annotator + ": NOT found in annotator preset")
+
+    # Preload prior knowledge
+    annotator_presets, sensor_presets, rules = preload(Global.curr_id)
+
+    # Set optimizer
+    # If no custom function, use default optimizer
+    Global.optimizer = Optimizer(rules)
+
+    # Retrieve annotating functions for current node
+    for annotator_name in annotator_presets:
+        module, complexity, sensor = annotator_presets[annotator_name]
+        Global.members["SELF"].annotators.add(
+            annotator_name, module, complexity, sensor
+        )
+
+    # Retrieve sensors info for current node
+    for sensor_name in sensor_presets:
+        module, src = sensor_presets[sensor_name]
+        sensor_manager = module.Constructor(Global.curr_id, src)
+        Global.members["SELF"].sensors.add(sensor_name, sensor_manager)
 
     Global.publisher_thread = async_run_after(0, publisher_init)
     async_run_after(0, subscriber_init)
-    async_run_after(0, detect_failure)
 
     print("All threads started...")
-    time.sleep(1000)
+    detect_failure()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--id", "-i", dest="id", type=str, help="Sensor ID")
-    parser.add_argument(
-        "--annotators", "-a", dest="annotators", type=str, help="Annotators {a,b,c...}"
-    )
     args = parser.parse_args()
     main(args)

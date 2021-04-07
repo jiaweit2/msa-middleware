@@ -3,41 +3,32 @@
 ## Install
 Clone the middleware, go to the directory:
 ```
-cd path/to/msa-middleware
+./install.sh
+```
+This will install everything. You may edit `install.sh` to only install some components.
 
-# Create Virtualenv
-python3 -m venv venv
+## Config
+Edit `middleware/custom/global-conf.json` to config the nodes information in the correct format. An example is given in that file.
 
-# Start Virtualenv
+## Run a Simulated Network
+Start the simulation in `mininet`:
+```
 source venv/bin/activate
-
-# Install requirements
-pip install -r requirements.txt 
-```
-
-### Environment Variables
-#### Add some variables in `venv/bin/activate` as follows
-Add mininet path to PYTHONPATH:
-```
-export PYTHONPATH=$PYTHONPATH:/path/to/mininet
-```
-Add dependent paths for YOLO(annotator):
-```
-export CFG_URL="path/to/darknet/cfg/yolov3-tiny.cfg"
-export WEIGHT_URL="path/to/darknet/yolov3-tiny.weights"
-export CLASS_URL="path/to/darknet/data/coco.names"
-```
-
-## Run
-Start the middleware in `msa-middleware/application/`
-```
 sudo python application/launch_mininet.py
 ```
 
-## Example Application
-Run `commander.py` on any host in mininet:
+## Run a Node
 ```
+./start.sh [-s | -n | -sn] [Node ID]
+```
+
+## Query Example
+Run `commander-camera.py` on any node:
+```
+# if in mininet
 xterm h1
+
+# run the commander to start the query in application/data/query
 source venv/bin/activate
 python -u application/commander.py
 ```

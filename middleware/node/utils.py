@@ -3,7 +3,6 @@ from threading import Thread
 from zmq import SNDMORE
 
 from middleware.node.const import *
-from middleware.preset.annotators import annotator_to_sensor
 
 
 def post_process_coa(coas):
@@ -59,21 +58,3 @@ def print_and_pub(topic, body, publisher, prefix=""):
 #             publisher.send(b"x" * PACKETSIZE)
 #         else:
 #             publisher.send(b"x" * PACKETSIZE, SNDMORE)
-
-
-def get_sensor_data(annotator, Global):
-    # Retrieve latest data from sensor
-    sensor = annotator_to_sensor[annotator]
-    if sensor == Sensor.CAM:
-        return Global.cam_manager.snapshot()
-    elif sensor == Sensor.IR:
-        return ""
-    elif sensor == Sensor.SR:
-        return ""
-
-
-def get_sensor_live(annotator, Global, to):
-    sensor = annotator_to_sensor[annotator]
-    # Should be all async functions
-    if sensor == Sensor.CAM:
-        Global.cam_manager.stream([to, "result", Global.publisher])

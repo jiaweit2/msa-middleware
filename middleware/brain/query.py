@@ -5,13 +5,17 @@ from middleware.node.utils import *
 
 def on_running_query(plan, Global):
     for predicate in plan:
-        owner, annotator = plan[predicate][0]
-        print_and_pub(
-            owner,
-            annotator + "\t" + Global.curr_id,
-            Global.publisher,
-            "stream",
-        )
+        owner, annotator_name = plan[predicate][0]
+        if owner == "SELF":
+            sensor_name = Global.members["SELF"].annotators.get(annotator_name)[2]
+            Global.members["SELF"].sensors.stream(sensor_name, Global, print_and_pub)
+        else:
+            print_and_pub(
+                owner,
+                annotator_name + "\t" + Global.curr_id,
+                Global.publisher,
+                "stream",
+            )
 
 
 def on_query(query, Global):
@@ -52,16 +56,17 @@ def schedule(Global):
                 Global.buffer[5] = predicate
                 num = Global.buffer[3] = len(plan[predicate])
             var = predicates[predicate][0]
-            for owner, annotator in plan[predicate]:
+            for owner, annotator_name in plan[predicate]:
                 if owner == "SELF":
-                    data = get_sensor_data(annotator, Global)
+                    sensor = Global.members["SELF"].annotators.get(annotator_name)[2]
+                    data = Global.members["SELF"].sensors.get_data(sensor)
                     vals.append(
-                        Global.members["SELF"].annotators.run(annotator, data, var)
+                        Global.members["SELF"].annotators.run(annotator_name, data, var)
                     )
                 else:
                     print_and_pub(
                         owner,
-                        annotator + "\t" + var + "\t" + Global.curr_id,
+                        annotator_name + "\t" + var + "\t" + Global.curr_id,
                         Global.publisher,
                         "get_data",
                     )

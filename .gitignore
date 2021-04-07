@@ -3,5 +3,5 @@
 .DS_Store
 *.pyc
 __pycache__/
-/cache
-temp
+dependency/
+ltmain.sh

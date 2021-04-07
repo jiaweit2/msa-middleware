@@ -1,6 +1,7 @@
 #!/usr/bin/python
 import time
 import os
+import sys
 
 from mininet.topo import Topo
 from mininet.net import Mininet
@@ -11,6 +12,11 @@ from mininet.term import makeTerms
 from mininet.link import TCLink
 from mininet.node import OVSSwitch, Controller, RemoteController
 
+from pathlib import Path
+
+p = Path(__file__).resolve().parents[1]
+sys.path.insert(0, p)
+
 
 class SingleSwitchTopo(Topo):
     # "Single switch connected to n hosts."
@@ -19,7 +25,7 @@ class SingleSwitchTopo(Topo):
         # Python's range(N) generates 0..N-1
         for h in range(n):
             host = self.addHost("h%s" % (h + 1))
-            self.addLink(host, switch, bw=5, delay="5ms")
+            self.addLink(host, switch, bw=1, delay="5ms")
 
 
 def run():
@@ -36,46 +42,43 @@ def run():
     h4.cmd("source venv/bin/activate")
 
     # Start the server at h1
-    h1.cmd("cd server")
-    h1.cmd("./start.sh")
-    h1.cmd("cd ..")
+    h1.cmd("./start.sh -s")
     time.sleep(1)
 
-    h4.cmd("python -u middleware/node/node.py --id 0004 --annotators NUL &")
-    h1.cmd("python -u middleware/node/node.py --id 0001 --annotators NUL &")
-    h3.cmd(
-        "python -u middleware/node/node.py --id 0003 --annotators YOLO > temp 2>&1 &"
-    )
-    h2.cmd("python -u middleware/node/node.py --id 0002 --annotators NUL &")
+    h4.cmd("python -u middleware/node/node.py --id 0004&")
+    h1.cmd("python -u middleware/node/node.py --id 0001&")
+    h3.cmd("python -u middleware/node/node.py --id 0003&")
+    h2.cmd("python -u middleware/node/node.py --id 0002&")
 
     h1.cmd("deactivate")
     h2.cmd("deactivate")
     h3.cmd("deactivate")
     h4.cmd("deactivate")
 
-    # Changing bandwidth
-    s1 = net.get("s1")
-    links1 = h1.connectionsTo(s1)
-    links2 = h3.connectionsTo(s1)
+    CLI(net)
 
-    terms = makeTerms([h1], "Term")
+    # -------------- Changing bandwidth --------------
+    # s1 = net.get("s1")
+    # links1 = h1.connectionsTo(s1)
+    # links2 = h3.connectionsTo(s1)
 
-    while True:
-        try:
-            bw = float(input("Modify bandwidth to: "))
-        except Exception:
-            continue
-        except KeyboardInterrupt:
-            break
-        links1[0][1].config(bw=bw)
-        links2[0][1].config(bw=bw)
-        # net.iperf((h1, h3), l4Type="TCP")
+    # terms = makeTerms([h1], "Term")
+
+    # while True:
+    #     try:
+    #         bw = float(input("Modify bandwidth to: "))
+    #     except Exception:
+    #         continue
+    #     except KeyboardInterrupt:
+    #         break
+    #     links1[0][1].config(bw=bw)
+    #     links2[0][1].config(bw=bw)
 
     print("\nSimulation End")
 
     # Cleanup
-    for p in terms:
-        p.kill()
+    # for p in terms:
+    #     p.kill()
     h1.cmd("pkill -f aurora")
     h1.cmd("pkill -f node")
     h2.cmd("pkill -f node")

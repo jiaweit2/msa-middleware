@@ -1,0 +1,28 @@
+{
+    "annotator_presets": {
+        "0003": [
+            "yolo",
+            5,
+            "camera"
+        ],
+        "0002": [
+            "yolo",
+            5,
+            "camera"
+        ]
+    },
+    "rules": {
+        "person": [
+            [
+                "yolo"
+            ]
+        ]
+    },
+    "sensor_presets": {
+        "0003": [
+            "camera",
+            "./application/data/footage-480p.mp4"
+        ]
+    },
+    "server_ip": "10.0.0.1"
+}

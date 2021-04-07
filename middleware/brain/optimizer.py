@@ -1,12 +1,13 @@
-from middleware.preset.rules import *
-
-
 def least_cost_annotators(members, annotator_wanted=None):
     # Find least-cost annotator(s) owner
     annotators = {}  # -> [owner, cost]
     for id_ in members:
         for annotator in members[id_].annotators.map:
             if annotator_wanted and annotator != annotator_wanted:
+                continue
+            # Check if the node has the sensor
+            sensor_name = members[id_].annotators.map[annotator][2]
+            if sensor_name not in members[id_].sensors.map:
                 continue
             # cost = complexity * throughput(mb/s)
             c = members[id_].annotators.map[annotator][1] * members[id_].throughput
@@ -19,7 +20,7 @@ def least_cost_annotators(members, annotator_wanted=None):
 
 def basic_cost_func(args):
     # Metrics: network delay, annotator complexity
-    predicates, members = args
+    predicates, members, rules = args
     annotators = least_cost_annotators(members)
     plan = {}  # predicate -> [(owner, annotator), ...]
     cost = {}  # predicate -> cost
@@ -38,8 +39,9 @@ def basic_cost_func(args):
 
 
 class Optimizer:
-    def __init__(self, cost_func=basic_cost_func):
+    def __init__(self, rules, cost_func=basic_cost_func):
         self.cost_func = cost_func
+        self.rules = rules
 
     def filter(self, members, pos):
         # filter 1: not-in-range nodes(sensors)
@@ -47,4 +49,4 @@ class Optimizer:
 
     def find_cost(self, predicates, members, pos):
         members = self.filter(members, pos)
-        return self.cost_func([predicates, members])
+        return self.cost_func([predicates, members, self.rules])
