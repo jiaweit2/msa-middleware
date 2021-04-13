@@ -71,7 +71,7 @@ class AnnotatorSet:
                 k, cost, sensor_name = item.split(",")
                 if k not in self.map:
                     self.map[k] = [None, int(cost), sensor_name]
-                elif cost < self.map[k][1]:
+                elif int(cost) < self.map[k][1]:
                     self.map[k][1] = int(cost)
 
     def get_annotated(self, annotator_name, data):
@@ -93,25 +93,25 @@ class SensorSet:
         # sensor_name -> sensor_manager
         self.map = {}
 
-    def add(self, sensor_name, sensor_manager):
-        self.map[sensor_name] = sensor_manager
+    def add(self, sensor_name, sensor_manager, pos):
+        self.map[sensor_name] = (sensor_manager, pos)
 
     def remove(self, k):
         del self.map[k]
 
     def get(self, k):
-        return self.map[k]
+        return self.map[k][0]
 
     def get_data(self, sensor_name):
-        return self.map[sensor_name].get_data()
+        return self.get(sensor_name).get_data()
 
     def stream(self, sensor_name, Global, print_and_pub, topic="result"):
-        self.map[sensor_name].stream([topic, Global, print_and_pub])
+        self.get(sensor_name).stream([topic, Global, print_and_pub])
 
     def adapt(self, bw_diff, reset_publisher):
         for sensor_name in self.map:
-            if self.map[sensor_name].is_streaming:
-                self.map[sensor_name].adapt(bw_diff, reset_publisher)
+            if self.get(sensor_name).is_streaming:
+                self.get(sensor_name).adapt(bw_diff, reset_publisher)
 
     def update(self, s):
         if s:
@@ -424,9 +424,9 @@ def main(args):
 
     # Retrieve sensors info for current node
     for sensor_name in sensor_presets:
-        module, src = sensor_presets[sensor_name]
+        module, src, pos = sensor_presets[sensor_name]
         sensor_manager = module.Constructor(Global.curr_id, src)
-        Global.members["SELF"].sensors.add(sensor_name, sensor_manager)
+        Global.members["SELF"].sensors.add(sensor_name, sensor_manager, pos)
 
     Global.publisher_thread = async_run_after(0, publisher_init)
     async_run_after(0, subscriber_init)

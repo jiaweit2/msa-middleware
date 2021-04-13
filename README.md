@@ -28,7 +28,7 @@ Run `commander-camera.py` on any node:
 # if in mininet
 xterm h1
 
-# run the commander to start the query in application/data/query
+# run the commander to start the query (in application/data/query)
 source venv/bin/activate
-python -u application/commander.py
+python -u application/commander-camera.py
 ```

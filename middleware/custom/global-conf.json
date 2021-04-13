@@ -21,7 +21,8 @@
     "sensor_presets": {
         "0003": [
             "camera",
-            "./application/data/footage-480p.mp4"
+            "./application/data/footage-480p.mp4",
+            "100,290"
         ]
     },
     "server_ip": "10.0.0.1"

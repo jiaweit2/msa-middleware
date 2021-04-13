@@ -25,7 +25,7 @@ def basic_cost_func(args):
     plan = {}  # predicate -> [(owner, annotator), ...]
     cost = {}  # predicate -> cost
     for k, v in predicates.items():
-        var = v[0]
+        var = v[0].split("@")[0]
         cost[k] = float("inf")
         plan[k] = None
         for combo in rules[var]:

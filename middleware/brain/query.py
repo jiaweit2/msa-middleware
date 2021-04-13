@@ -24,6 +24,7 @@ def on_query(query, Global):
     a = AthenaParser()
     a.load_str(input_str)
     decision_logic, coa_validity, predicates = a.variables[name][1:4]
+    print(a.variables)
     post_process_coa(coa_validity)
     cost, plan = Global.optimizer.find_cost(predicates, Global.members, position)
     if status == "running":
@@ -55,25 +56,48 @@ def schedule(Global):
             with Global.lock:
                 Global.buffer[5] = predicate
                 num = Global.buffer[3] = len(plan[predicate])
-            var = predicates[predicate][0]
-            for owner, annotator_name in plan[predicate]:
-                if owner == "SELF":
-                    sensor = Global.members["SELF"].annotators.get(annotator_name)[2]
-                    data = Global.members["SELF"].sensors.get_data(sensor)
-                    vals.append(
-                        Global.members["SELF"].annotators.run(annotator_name, data, var)
-                    )
-                else:
-                    print_and_pub(
-                        owner,
-                        annotator_name + "\t" + var + "\t" + Global.curr_id,
-                        Global.publisher,
-                        "get_data",
-                    )
+            var_tuple = predicates[predicate][0].split("@")
+            var = var_tuple[0]
+            if len(var_tuple) == 1:
+                # Not specifying any sensor as the source
+                for owner, annotator_name in plan[predicate]:
+                    if owner == "SELF":
+                        sensor = Global.members["SELF"].annotators.get(annotator_name)[
+                            2
+                        ]
+                        data = Global.members["SELF"].sensors.get_data(sensor)
+                        vals.append(
+                            Global.members["SELF"].annotators.run(
+                                annotator_name, data, var
+                            )
+                        )
+                    else:
+                        print_and_pub(
+                            owner,
+                            annotator_name + "\t" + var + "\t" + Global.curr_id,
+                            Global.publisher,
+                            "get_data",
+                        )
+            else:
+                # Specify a sensor as the source
+                for owner, annotator_name in plan[predicate]:
+                    if owner == var_tuple[1]:
+                        print_and_pub(
+                            owner,
+                            annotator_name + "\t" + var + "\t" + Global.curr_id,
+                            Global.publisher,
+                            "get_data",
+                        )
+                    break
+
             if len(vals) < num:
                 # wait for more remote sensor values
                 return
-        d.set_var_value(predicates[predicate][0], float(sum(vals)) / float(len(vals)))
+        if type(vals[0]) == str:
+            val = vals[0]
+        else:
+            val = float(sum(vals)) / float(len(vals))
+        d.set_var_value(predicates[predicate][0], val)
         with Global.lock:
             # reset buffer values
             vals = []
@@ -82,3 +106,13 @@ def schedule(Global):
     with Global.lock:
         Global.buffer = None
     print_and_pub("result", d.get_value(), Global.publisher)
+
+
+if __name__ == "__main__":
+    s = """/YOLO = Decision({ 
+            "Human": person@0003 > 0.3,
+            "NoHumanDetected": otherwise
+        })"""
+    a = AthenaParser()
+    a.load_str(s)
+    print(a.variables)

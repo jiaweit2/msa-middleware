@@ -1,6 +1,6 @@
 129.2,291.3
-running
+static
 /YOLO = Decision({
-    "Human": person > 0.3,
+    "Human": person@0003 > 0.3,
     "NoHumanDetected": otherwise
 })

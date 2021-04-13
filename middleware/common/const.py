@@ -92,7 +92,7 @@ COMMENT: /#[^\n]*/
 _NEWLINE: ( /\r?\n[\t ]*/ | COMMENT )+
 BOOLEAN: "True" | "False"
 
-NAME: [ "%" | "$" ] ( LETTER | DIGIT | /[u"\u00A0-\u04FF"]/ | "/" | "_" | "." )+
+NAME: [ "%" | "$" ] ( "@" | LETTER | DIGIT | /[u"\u00A0-\u04FF"]/ | "/" | "_" | "." )+
 
 %import common.CNAME
 %import common.LETTER

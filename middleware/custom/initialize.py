@@ -25,8 +25,9 @@ def preload(id_):
     # Load available sensors
     sensor_presets = {}
     if id_ in conf["sensor_presets"]:
-        name, src = conf["sensor_presets"][id_]
-        sensor_presets[name] = [__import__(name), src]
+        name, src, pos = conf["sensor_presets"][id_]
+        pos = pos.split(",")
+        sensor_presets[name] = [__import__(name), src, (float(pos[0]), float(pos[1]))]
 
     # Load rules
     rules = conf["rules"]
