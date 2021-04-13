@@ -1,8 +1,10 @@
 import time
-from threading import Thread
+from threading import Thread, RLock
 from zmq import SNDMORE
 
 from middleware.node.const import *
+
+publish_lock = RLock()
 
 
 def post_process_coa(coas):
@@ -40,7 +42,9 @@ def print_and_pub(topic, body, publisher, prefix=""):
 
     if publisher.closed:
         return "Closed"
-    publisher.send_multipart([btopic, bprefix, bbody])
+
+    with publish_lock:
+        publisher.send_multipart([btopic, bprefix, bbody])
 
 
 # def measure_throughput(Global, receiver):
