@@ -11,7 +11,8 @@ This will install everything. You may edit `install.sh` to only install some com
 
 
 ## Config
-Edit `middleware/custom/global-conf.json` to config the nodes information in the correct format. An example is given in that file.
+- Edit `middleware/custom/global-conf.json` to config the nodes information in the correct format. An example is given in that file.
+- Write your own query in `application/data/query`.
 
 
 ## Run a Node
