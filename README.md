@@ -10,10 +10,13 @@ Clone the middleware, go to the directory:
 This will install everything. You may edit `install.sh` to only install some components.
 
 
-## Config
+## Customization
+Users may edit the following files to customize:
 - Edit `middleware/custom/global-conf.json` to config the nodes information in the correct format. An example is given in that file.
 - Write your own query in `application/data/query`.
-
+- Write your own annotators/sensors under `middleware/custom/`.
+- Write your own commander method in `application/commander-template.py` for running (streaming) query only, static query already implemented. 
+You may skip this section if you want to run the default demo.
 
 ## Run a Node
 ```
