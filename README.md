@@ -16,6 +16,7 @@ Users may edit the following files to customize:
 - Write your own query in `application/data/query`.
 - Write your own annotators/sensors under `middleware/custom/`.
 - Write your own commander method in `application/commander-template.py` for running (streaming) query only, static query already implemented. 
+
 You may skip this section if you want to run the default demo.
 
 ## Run a Node
