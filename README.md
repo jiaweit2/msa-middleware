@@ -11,7 +11,7 @@ This will install everything. You may edit `install.sh` to only install some com
 
 
 ## Customization
-Users may edit the following files to customize:
+All custom files are expected to be Python files. Users may edit the following files to customize:
 - Edit `middleware/custom/global-conf.json` to config the nodes information in the correct format. An example is given in that file.
 - Write your own query in `application/data/query`.
 - Write your own annotators/sensors under `middleware/custom/`.
