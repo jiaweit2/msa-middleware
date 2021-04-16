@@ -1,5 +1,5 @@
 # MSA-Middleware
-This middleware follows the MDO effect loop for query-centric event detection, providing optimizations for resource-constrained networks. It is designed to be easy to use, deploy and customize. In practice, the middleware is expected to be installed on every node to form a network. Python3 is requried. More details about the motivations, architecture, application examples and evaulations can be found in this [paper](https://drive.google.com/file/d/1wL_WE4y1kJTB6scQzbTcRWNUiQ0OkRGv/view?usp=sharing).
+This middleware follows the MDO effect loop for query-centric event detection, providing optimizations for resource-constrained networks. It is designed to be easy to use, deploy and customize. In practice, the middleware is expected to be installed on every node to form a network. Python3 is required. More details about the motivations, architecture, application examples and evaulations can be found in this [paper](https://drive.google.com/file/d/1wL_WE4y1kJTB6scQzbTcRWNUiQ0OkRGv/view?usp=sharing).
 
 
 ## Install
