@@ -1,5 +1,5 @@
 # MSA-Middleware
-This middleware follows the MDO effect loop for query-centric event detection, providing optimizations for resource-constrained networks. It is designed to be easy to use, deploy and customize. In practice, the middleware is expected to be installed on every node to form a network. Python3 is requried.
+This middleware follows the MDO effect loop for query-centric event detection, providing optimizations for resource-constrained networks. It is designed to be easy to use, deploy and customize. In practice, the middleware is expected to be installed on every node to form a network. Python3 is requried. More details about the motivations, architecture, application examples and evaulations can be found in this [paper]{https://drive.google.com/file/d/1wL_WE4y1kJTB6scQzbTcRWNUiQ0OkRGv/view?usp=sharing}.
 
 
 ## Install
@@ -17,7 +17,7 @@ All custom files are expected to be Python files. Users may edit the following f
 - Write your own annotators/sensors under `middleware/custom/`.
 - Write your own commander method in `application/commander-template.py` for running (streaming) query only, static query already implemented. 
 
-You may skip this section if you want to run the default demo.
+Details may be found in this [wiki]{https://github.com/jiaweit2/msa-middleware/wiki/Customization}. You may skip this section if you want to run the default demo.
 
 ## Run a Node
 ```
