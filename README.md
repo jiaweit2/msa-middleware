@@ -22,6 +22,8 @@ All custom files are expected to be Python files. Details may be found in this [
 ```
 ./start.sh [-s | -n | -sn] [Node ID]
 ```
+A node ID is required when a node is run. For example, to start a broker/server: `./start.sh -s`; to start a node: `./start.sh -n 0001`.
+
 
 ## Run a Simulated Network
 Start the simulation in `mininet`:
