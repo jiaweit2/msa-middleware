@@ -13,6 +13,11 @@ if [ ! -d "dependency" ]
 then
     mkdir dependency
 fi
+
+
+############  Optional  ############
+
+# Install Mininet
 if [ ! -d "dependency/mininet" ]
 then
     cd dependency
@@ -22,9 +27,6 @@ then
     cd ..
     echo "export PYTHONPATH=\$PYTHONPATH:${path}" >> venv/bin/activate
 fi
-
-
-############  Optional  ############
 
 # Install YOLO key files
 if [ ! -d "dependency/yolo" ]
