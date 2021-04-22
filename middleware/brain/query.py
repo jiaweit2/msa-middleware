@@ -24,7 +24,6 @@ def on_query(query, Global):
     a = AthenaParser()
     a.load_str(input_str)
     decision_logic, coa_validity, predicates = a.variables[name][1:4]
-    print(a.variables)
     post_process_coa(coa_validity)
     cost, plan = Global.optimizer.find_cost(predicates, Global.members, position)
     if status == "running":
@@ -33,7 +32,7 @@ def on_query(query, Global):
         d = Decision(
             "/query_res", decision_logic, coa_validity, predicates, 60, cost=cost
         )
-        with Global.lock:
+        with Global.lock_query:
             Global.buffer = [d, plan, predicates, 0, [], None]
         schedule(Global)
 
@@ -53,7 +52,7 @@ def schedule(Global):
             if predicate is None:
                 print("Fail to conclude a decision!")
                 break
-            with Global.lock:
+            with Global.lock_query:
                 Global.buffer[5] = predicate
                 num = Global.buffer[3] = len(plan[predicate])
             var_tuple = predicates[predicate][0].split("@")
@@ -98,12 +97,12 @@ def schedule(Global):
         else:
             val = float(sum(vals)) / float(len(vals))
         d.set_var_value(predicates[predicate][0], val)
-        with Global.lock:
+        with Global.lock_query:
             # reset buffer values
             vals = []
 
     # a result is obtained
-    with Global.lock:
+    with Global.lock_query:
         Global.buffer = None
     print_and_pub("result", d.get_value(), Global.publisher)
 

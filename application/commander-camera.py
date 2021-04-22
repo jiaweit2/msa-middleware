@@ -77,30 +77,30 @@ def subscribe(is_running, publisher):
             print("Ideal Mbps: ", ideal_mbps)
             print("Mbps: ", mbps)
             print("Last Mbps: ", last_mode_mbps)
-            # if (not mode_adapting) and (
-            #     (mbps > last_mode_mbps and mode > 0 and latency < REFRESH_RATE)
-            #     or (
-            #         (mbps <= last_mode_mbps or latency > REFRESH_RATE * 1.5)
-            #         and mode < MODE_HIGHEST
-            #     )
-            # ):
-            #     print_and_pub(
-            #         sender,
-            #         str(mbps - ideal_mbps),
-            #         publisher,
-            #         "bw",
-            #     )
-            #     print("Mode switch request sent!")
+            if (not mode_adapting) and (
+                (mbps > last_mode_mbps and mode > 0 and latency < REFRESH_RATE)
+                or (
+                    (mbps <= last_mode_mbps or latency > REFRESH_RATE * 1.5)
+                    and mode < MODE_HIGHEST
+                )
+            ):
+                print_and_pub(
+                    sender,
+                    str(mbps - ideal_mbps),
+                    publisher,
+                    "bw",
+                )
+                print("Mode switch request sent!")
 
-            #     mode_adapting = True
-            #     last_mode_mbps = ideal_mbps
+                mode_adapting = True
+                last_mode_mbps = ideal_mbps
 
-            #     if mbps < ideal_mbps:
-            #         subscriber.close(linger=0)
-            #         context.destroy(linger=0)
-            #         print("Network is unstable, reconnect...")
-            #         time.sleep(REFRESH_RATE)
-            #         return True
+                if mbps < ideal_mbps:
+                    subscriber.close(linger=0)
+                    context.destroy(linger=0)
+                    print("Network is unstable, reconnect...")
+                    time.sleep(REFRESH_RATE)
+                    return True
 
             # Post processing
             if mode == 1 and bg is not None:

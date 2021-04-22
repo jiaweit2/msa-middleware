@@ -27,6 +27,7 @@ class Global:
     lock = RLock()
     lock_election = RLock()
     lock_msg = RLock()
+    lock_query = RLock()
     cv = Condition()
 
     buffer = None
@@ -301,15 +302,18 @@ def on_election_data(prefix, cand_id):
 
 def on_dm(prefix, body):
     if prefix == "get_data":
+        print("RECEIVE GET DATA")
         annotator_name, key, id_ = body.split("\t")
         sensor_name = Global.members["SELF"].annotators.get(annotator_name)[2]
         data = Global.members["SELF"].sensors.get_data(sensor_name)
         val = Global.members["SELF"].annotators.run(annotator_name, data, key)
         print_and_pub(id_, str(val), Global.publisher, "decide")
     elif prefix == "decide":
+        print("RECEIVED DESION VALS")
         val = eval(body)
         if Global.buffer and len(Global.buffer) == 6:
-            Global.buffer[4].append(val)
+            with Global.lock_query:
+                Global.buffer[4].append(val)
             schedule(Global)
     elif prefix == "stream":
         annotator_name, to = body.split("\t")

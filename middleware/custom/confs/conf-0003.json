@@ -1,0 +1,16 @@
+{
+    "annotator_presets": [
+        [
+            "yolo",
+            5,
+            "camera"
+        ]
+    ],
+    "sensor_presets": [
+        [
+            "camera",
+            "./application/data/footage-480p.mp4",
+            "100,290"
+        ]
+    ]
+}

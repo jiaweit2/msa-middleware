@@ -12,9 +12,10 @@ This will install everything. You may edit `install.sh` to only install some com
 
 ## Customization
 All custom files are expected to be Python files. Details may be found in this [wiki](https://github.com/jiaweit2/msa-middleware/wiki/Customization). You may skip this section if you just want to run the default demo. Users may edit the following files to customize:
-- Edit `middleware/custom/global-conf.json` to config the nodes information in the correct format. An example is given in that file.
+- Edit `middleware/custom/confs/global-conf.json` to config the global settings.
+- Create or edit `middleware/custom/confs/conf-{Node ID}.json` to config each node respectively.
 - Write your own query in `application/data/query`.
-- Write your own annotators/sensors under `middleware/custom/`.
+- Write your own annotators/sensors under corresponding directories of `middleware/custom/`.
 - Write your own commander method in `application/commander-template.py` for running (streaming) query only, static query already implemented. 
 
 
@@ -35,7 +36,7 @@ sudo python application/launch_mininet.py
 ## Query Example
 Run `commander-camera.py` on any node:
 ```
-# if in mininet
+# if in mininet:
 xterm h1
 
 # run the commander to start the query (in application/data/query)
